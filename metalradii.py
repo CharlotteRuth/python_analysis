@@ -2,6 +2,9 @@
 # 6/22/16   
 #Calculate radial distribution of mass and metals that were once part of the disk
 
+#Run with
+#%run /home/christensen/Code/python/python_analysis/metalradii.py
+
 import matplotlib as mpl
 mpl.use('Agg') #This command ensures that the plots are not displayed, allowing it to work in parallel. Because of it, you can not run python with the --pylab option
 import matplotlib.pylab as plt
@@ -35,19 +38,105 @@ def loadfiles(task):
     h = hs[int(grp)]
     print("halos loaded")
     pynbody.analysis.halo.center(h,mode='com') #not as accurate as hyb but saves memory and time
-    
+    print("halo center of mass")
     pynbody.analysis.angmom.sideon(h)
-    print('halo aligned')
-    hrvir = np.max(h.gas['r'])      
+    print("halo aligned")
+    hrvir = np.max(h.gas['r'])   
+   
+    print("Read in .fits files")
+    """
     #Read in iords of all particle that have been in the disk
-    disk_iord_file = pyfits.open(dirs + 'grp' + grp + '.reaccrdisk_iord.fits')
+    disk_iord_file = pyfits.open(dirs + 'grp' + grp + '.reaccrdiskall_iord.fits')
+    #Include those particles that start off in the disk
+    disk_early_iord_file = pyfits.open(dirs + 'grp' + grp + '.earlydisk_iord.fits')
+    """
+
+    #Read in iords of all particles that have been in the halo
+    disk_iord_file = pyfits.open(dirs + 'grp' + grp + '.reaccr_iord.fits')
+    #Include those particles that start off in the disk
+    disk_early_iord_file = pyfits.open(dirs + 'grp' + grp + '.earlyhalo_iord.fits')
+
     disk_iord = disk_iord_file[0].data
-    indicies = np.in1d(s['iord'],disk_iord)
-    disk_parts = s[np.nonzero(indicies)]
+    disk_early_iord = disk_early_iord_file[0].data
+    disk_iord = np.concatenate((disk_iord,disk_early_iord))
+
+    indicies = np.in1d(s.star['igasorder'],disk_iord) #Select for star particles in the main simulation that formed out of gas particles once in the disk/halo.
+    disk_parts_star = s.star[np.nonzero(indicies)] #Note that multiple star particles can form from the same gas particle
+    #Merge list of star formed from disk gas with list of all stars in halo at z = 0
+    iord_disk_parts_star = disk_parts_star['iord'] #stars formed out of gas that was in the disk
+    iord_halo_star = h.star['iord'] #stars in halo at z = 0
+    iord_stars = np.concatenate((iord_disk_parts_star,iord_halo_star)) #concatenate arrays of iord
+    temp, indices = np.unique(iord_stars, return_index=True) #remove duplicate stars
+    iord_stars = iord_stars[indices]
+
+    #Array of gas iords and star iords
+    iord_all = np.concatenate((disk_iord,iord_stars)) #concatenate arrays of iord
+    indicies = np.in1d(s['iord'],iord_all)
+    disk_parts = s[np.nonzero(indicies)] #Note, many of the gas particles in disk_iord will have been deleted by z = 0 because of star formation
+
+    #Calculate metallicity of gas and stars from O and Fe and the radius
+    disk_parts.gas['metalMassFrac'] = 2.09*disk_parts.gas['OxMassFrac'] + 1.06*disk_parts.gas['FeMassFrac']
+    disk_parts.star['metalMassFrac'] = 2.09*disk_parts.star['OxMassFrac'] + 1.06*disk_parts.star['FeMassFrac']
+    disk_parts.dark['metalMassFrac'] = 0
+    disk_parts['rad'] = np.sqrt(disk_parts['x']**2 + disk_parts['y']**2 + disk_parts['z']**2)
+ 
+    # Goal: for any particle that is out of the halo at z = 0, use its metallicity at the time it left the halo, rather than its current metallicity
+    reoutflow_iord_file = pyfits.open(dirs + 'grp' + grp + '.reoutflow_iord.fits') #All gas that exited the disk after having been in it
+    reoutflow_iord = reoutflow_iord_file[0].data
+    reoutflow_iord_rev = reoutflow_iord[::-1]
+    temp, indices = np.unique(reoutflow_iord_rev, return_index=True) #indicies corresponding to unique outflow particles
+    reoutflow_iord_rev_uniq = reoutflow_iord_rev[indices]
+
+    reoutflow_met_file = pyfits.open(dirs + 'grp' + grp + '.reoutflow_history.fits')
+    reoutflow_met = reoutflow_met_file[1].data['metallicity']
+    reoutflow_met_rev = reoutflow_met[::-1]
+    reoutflow_met_rev_uniq = reoutflow_met_rev[indices]
+
+    # Select for only those outflowing particles that are gasous and outside of the halo at z = 0
+    indicies = np.in1d(reoutflow_iord_rev_uniq,s['iord'])
+    reoutflow_iord_rev_uniq = reoutflow_iord_rev_uniq[np.nonzero(indicies)] #Only those particles that are gasous at z = 0
+    reoutflow_met_rev_uniq = reoutflow_met_rev_uniq[np.nonzero(indicies)]
+    indicies = np.in1d(reoutflow_iord_rev_uniq,h['iord'],invert = 1) #only those particles that are not in the halo
+    reoutflow_iord_rev_uniq_out = reoutflow_iord_rev_uniq[np.nonzero(indicies)]
+    reoutflow_met_rev_uniq_out = reoutflow_met_rev_uniq[np.nonzero(indicies)]
+
+    #Select all particles that were in the halo but then leave it
+    #to make sure that all gas particles in outflow were once accreted (debugging)
+    disk_iord_uniq = np.unique(disk_iord)
+    indicies = np.in1d(disk_iord_uniq,reoutflow_iord_rev_uniq)
+    print(len(reoutflow_iord_rev_uniq))
+    print(len(disk_iord_uniq[np.nonzero(indicies)]))
+    indicies = np.in1d(reoutflow_iord_rev_uniq,disk_iord_uniq)
+    print(len(reoutflow_iord_rev_uniq[np.nonzero(indicies)])) 
+    #Why do these arrays not have the same length?!
+    #Why are there particles in reoutflow that aren't in reaccr or early_halo?!
+
+    # Replace their metallicity 
+    # Matching particles in the outflow to those in disk_iord
+    iord_intersect = np.intersect1d(disk_parts['iord'],reoutflow_iord_rev_uniq_out) #Find the iords of the elements in common
+    a = disk_parts['iord']
+    b = reoutflow_iord_rev_uniq_out
+    intersect = np.intersect1d(a,b)
+    asort = np.argsort(a)
+    a_ind = np.searchsorted(a,intersect,sorter = asort)
+    bsort = np.argsort(b)
+    b_ind = np.searchsorted(b,intersect,sorter = bsort)
+    inda = asort[a_ind]
+    indb = bsort[b_ind]
+
+    # Debugging plot to make sure that z = 0 and exiting metallicities are reasonable similar
+    fig = plt.figure(6)
+    temp = plt.hist2d(np.log10(np.array(disk_parts[inda]['metalMassFrac'])),np.log10(reoutflow_met_rev_uniq_out[indb]),bins = 400)
+    plt.xlabel('log z = 0 Metallicity')
+    plt.ylabel('log Metallicity when expelled')
+    plt.plot([-9,0],[-9,0],color = 'k')
+
+    disk_parts[inda]['metalMassFrac'] = reoutflow_met_rev_uniq_out[indb]
+
     #Make images
     outfilebase = dirs + files + '.grp' + grp
     print('Disk particles selected, now write to ' + outfilebase)
-    outflowImages(s,disk_parts,hrvir,outfilebase)
+    #outflowImages(s,disk_parts,hrvir,outfilebase)
     pltZvsR(disk_parts,hrvir,outfilebase)
     print 'Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     tend = time.clock()
@@ -55,7 +144,7 @@ def loadfiles(task):
 
 
 def outflowImages(s,disk_parts,hrvir,outfilebase):
-#Plots all material that has been in the disk of the galaxy
+#Plots all material that has been in the disk/halo of the galaxy
     width = 20*hrvir
     fig = plt.figure(0)
     ax = fig.add_subplot(1,1,1)
@@ -77,7 +166,7 @@ def outflowImages(s,disk_parts,hrvir,outfilebase):
     plt.show()
     plt.close()
     
-#Plots all material that has been in the disk of the galaxy
+#Plots all material that has been in the disk/halo of the galaxy
     fig = plt.figure(1)
     ax = fig.add_subplot(1,1,1)
     sim = pp.sph.image(s.gas,
@@ -95,7 +184,7 @@ def outflowImages(s,disk_parts,hrvir,outfilebase):
     plt.show()
     plt.close()
 
-#Plots all material that has been in the disk of the galaxy
+#Plots all material that has been in the disk/halo of the galaxy
     fig = plt.figure(2)
     ax = fig.add_subplot(1,1,1)
     disk_parts.gas['oxden'] = disk_parts.gas['rho']*disk_parts.gas['OxMassFrac']
@@ -128,23 +217,41 @@ def pltZvsR(disk_parts,hrvir,outfilebase,color = 'k'):
 #Histogram of gas vs radius
 #disk_parts.gas['radius'] = sqrt(disk_parts.gas['x'].in_units('kpc')**2 + disk_parts.gas['y'].in_units('kpc')**2 + disk_parts.gas['z'].in_units('kpc')**2)
 #
-    hist, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass'])
+
+    #Histogram of mass
+    #hist, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass'])
+    hist, bin_edges = np.histogram(disk_parts['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts['mass'])
     histcum = np.cumsum(hist)
-#plt.bar(bin_edges[:-1], hist, width = min(diff(bin_edges)))
-#plt.semilogy((bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum))
+    hist_g, bin_edges_g = np.histogram(disk_parts.gas['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.g['mass'])
+    histcum_g = np.cumsum(hist_g)
+    hist_s, bin_edges_s = np.histogram(disk_parts.star['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.s['mass'])
+    histcum_s = np.cumsum(hist_s)
+
+    #plt.bar(bin_edges[:-1], hist, width = min(diff(bin_edges)))
+    #plt.semilogy((bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum))
     fig1 = plt.figure(4)
     ax1 = fig1.add_subplot(111)
-    ax1.plot((bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum),color = color)
+    ax1.plot((bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum),color = color) #all
+    #ax1.plot((bin_edges_g[:-1] + bin_edges_g[1:])/2,histcum_g/max(histcum),color = color) #gas
+    #ax1.plot((bin_edges_s[:-1] + bin_edges_s[1:])/2,histcum_s/max(histcum),color = color) #stars
     ax1.set_xlabel('Radius/R_vir')
     ax1.set_ylabel('Cumulative histogram of gas')
     ax1.axis([0, 20, 0, 1])
     fig1.savefig(outfilebase + '_rhistmass.png')
   
-    histmet, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['metals'])
+    #Histogram of Metals
+    histmet, bin_edges = np.histogram(disk_parts['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts['mass']*disk_parts['metalMassFrac'])
     histcummet = np.cumsum(histmet)
+    histmet_g, bin_edges = np.histogram(disk_parts.gas['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['metalMassFrac'])
+    histcummet_g = np.cumsum(histmet_g)
+    histmet_s, bin_edges = np.histogram(disk_parts.star['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.star['mass']*disk_parts.star['metalMassFrac'])
+    histcummet_s = np.cumsum(histmet_s)
+
     fig2 = plt.figure(5)
     ax2 = fig2.add_subplot(111)
     ax2.plot((bin_edges[:-1] + bin_edges[1:])/2,histcummet/max(histcummet),color = color)
+    #ax2.plot((bin_edges_g[:-1] + bin_edges_g[1:])/2,histcummet_g/max(histcummet),color = color) #gas
+    #ax2.plot((bin_edges_s[:-1] + bin_edges_s[1:])/2,histcummet_s/max(histcummet),color = color) #stars
     ax2.set_xlabel('Radius/R_vir')
     ax2.set_ylabel('Cumulative histogram of metals')
     ax2.axis([0, 20, 0, 1])
@@ -206,16 +313,17 @@ if __name__ == '__main__':
     
     tasks = []
     #for i in range(0,len(dirs)): 
-    for i in range(0,len(dirs)):   
+    for i in range(14,len(dirs)):   
         tasks.append((dirs[i],files[i],haloid[i],finalstep))
 
+    
     pool = multiprocessing.Pool(processes=1,maxtasksperchild=1)
     results = pool.map_async(loadfiles,tasks)
     pool.close()
     pool.join()
 
-"""
-    for i in range(0,len(dirs)-1):
+    """
+    for i in range(10,len(dirs)-1):
         
         loadfiles(tasks[i])
         #colorVal = scalarMap.to_rgba(values[i])
@@ -225,7 +333,7 @@ if __name__ == '__main__':
         h = 0
         disk_parts = 0
         print 'Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-""" 
+     """
        
 
 
