@@ -2,6 +2,10 @@
 #6/22/16
 #Plot the cumulative radial histrograms of mass and metals that were once part of the disk. This program relies on output from metalradii.py
 
+#Run with
+#%run /home/christensen/Code/python/python_analysis/metalradiihist.py
+
+
 import matplotlib as mpl
 import matplotlib.pylab as plt
 import matplotlib.mlab as mlab
@@ -23,6 +27,7 @@ import time
 #import matplotlib_ref_density
 
 if __name__ == '__main__':
+    zsolar = 0.0130215
     prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
     finalstep = '00512'
 
@@ -51,6 +56,8 @@ if __name__ == '__main__':
     files   = np.array([file799,file799,file799,file516,file516,file986,file986,file986,file986,file986,file986,file603,file603,file603,file258,file258,file285,file285,file285,file239])
     haloid =  np.array([ '1'   , '4'   , '6'   , '1'   , '2'   , '1'   , '2'   , '3'   , '8'   , '15'  , '16'  , '1'   , '2'    , '3'  , '1'   , '4'   , '1'   , '4'   , '9'   , '1'   ])
     masssort =np.array([10,      2,      9,      1,      8,      15,     18,     4,      0,      13,     17,     3,      7,      6,      12,     5,      11,     14,     16,     19])
+    rvir = np.array([74.0411,48.9178,42.3562,86.9863,62.8630,146.7808,100.5479,86.6712,56.5890,42.4110,37.9315,180.7260,121.0822,63.5753,237.1644,57.4247,247.5753,83.4658,58.8356,250.5206])
+    rvir = rvir[masssort]
     dirs = dirs[masssort]
     files = files[masssort]
     haloid = haloid[masssort]
@@ -82,24 +89,35 @@ if __name__ == '__main__':
     #    histcumfe = np.cumsum(histfe)
 
     fig1 = plt.figure(1,figsize=(14,4))
-    #fig2 = plt.figure(2)
+    fig2 = plt.figure(2)
     fig3 = plt.figure(3)
     fig4 = plt.figure(4)
+    fig5 = plt.figure(5,figsize=(14,4))
     gs = gridspec.GridSpec(1,3,width_ratios=[15,15,1])
+    gs1 =  gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax1 = fig1.add_subplot(gs[0])
-    ax2 = fig1.add_subplot(gs[1])
-    ax2sub = fig1.add_subplot(gs[2])
+    ax1b = fig1.add_subplot(gs[1])
+    ax1sub = fig1.add_subplot(gs[2])
+    ax2 = fig2.add_subplot(gs1[0])
+    ax2sub = fig2.add_subplot(gs1[1])
     ax3 = fig3.add_subplot(111)
     ax4 = fig4.add_subplot(111)
+    ax5 = fig5.add_subplot(gs[0])
+    ax5b = fig5.add_subplot(gs[1])
+    ax5sub = fig5.add_subplot(gs[2])
 
     first = ax1.plot([1,1],[0,1],linestyle = '--',color = 'k') #,cmap = cm_rainbow)
-    ax2.plot([1,1],[0,1],linestyle = '--',color = 'k')
+    ax1b.plot([1,1],[0,1],linestyle = '--',color = 'k')
+    ax2.plot([1,1],[0,1e3*zsolar],linestyle = '--',color = 'k')
+    ax2.plot([1e-1,1e3],[1,1],linestyle = '--',color = 'k')
     ax3.plot([1,1],[0,1],linestyle = '--',color = 'k')
     ax4.plot([1,1],[0,1],linestyle = '--',color = 'k')
+#   first = ax5.plot([1,1],[0,1],linestyle = '--',color = 'k') #,cmap = cm_rainbow)
+#   ax5b.plot([1,1],[0,1],linestyle = '--',color = 'k')
     mtot_list = []
     mtot_list = [3.2e9, 4.4e9, 4.4e9, 6.8e9, 1.1e10,1.1e10,1.2e10,1.5e10,2.4e10,2.9e10,3.4e10,3.8e10,3.8e10,5.9e10,1.0e11,1.9e11,3.4e11,7.7e11,8.8e11,9.1e11]
 
-    for i in reversed(range(0,len(dirs))):
+    for i in reversed(range(0,14)): #len(dirs))):
         #tfile = dirs[i] + files[i] + '.' + '00512' + '/' + files[i] + '.' + '00512'
         #s = pynbody.load(tfile)
         #hs = s.halos()       
@@ -111,13 +129,21 @@ if __name__ == '__main__':
 
         outfilebase = dirs[i] + files[i] + '.grp' + haloid[i]
         data = np.loadtxt(outfilebase + '_rhistz.txt')
+        data_log =  np.loadtxt(outfilebase + '_rhistz_log.txt')
+        print(outfilebase)
         colorVal = scalarMap.to_rgba(np.log10(mtot_list[i])) #values[i])
         #linecolor = (alog10(mtot_t) - 9.5)/2.5
-
+        masshist = np.subtract(data_log[:,1], np.append([0],data_log[0:-1,1]))
+        metalhist = np.subtract(data_log[:,2], np.append([0],data_log[0:-1,2]))
         ax1.plot(data[:,0],data[:,1],color = colorVal,linestyle = '-',lw = 2)
-        ax2.plot(data[:,0],data[:,2],color = colorVal,linestyle = '-',lw = 2)
+        ax1b.plot(data[:,0],data[:,2],color = colorVal,linestyle = '-',lw = 2)
+        ax2.plot(10**data_log[:,0],metalhist/masshist/zsolar,color = colorVal,linestyle = '-',lw = 2)
+        if max(metalhist/masshist/zsolar) > 1:
+            print("Error: ",i,outfilebase)
         ax3.plot(data[:,0],data[:,3],color = colorVal,linestyle = '-',lw = 2)
         ax4.plot(data[:,0],data[:,4],color = colorVal,linestyle = '-',lw = 2)
+        ax5.plot(data[:,0]*rvir[i],data[:,1],color = colorVal,linestyle = '-',lw = 2)
+        ax5b.plot(data[:,0]*rvir[i],data[:,2],color = colorVal,linestyle = '-',lw = 2)
         print(data[14,2]) #1 virial radii
 #        print(data[240,2]) #17.5 virial radii
 
@@ -127,23 +153,54 @@ if __name__ == '__main__':
     ax1.axis([0.1, 30, 0, 1])
     ax1.set_xscale('log')
   
+    ax1b.set_xlabel('Radius/R$_{vir}$')
+    ax1b.set_ylabel('Cumulative histogram of metals')
+    ax1b.axis([0.1, 30, 0, 1])
+    ax1b.set_xscale('log')
+
+    cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
+    cb.set_label('Log Virial Mass [M$_\odot$]')
+    fig1.show()
+    fig1.savefig(outfilebase + '_rhistmass_z.png')
+
     ax2.set_xlabel('Radius/R$_{vir}$')
-    ax2.set_ylabel('Cumulative histogram of metals')
-    ax2.axis([0.1, 30, 0, 1])
+    ax2.set_ylabel('Metallicity [Z/Z$_{\odot}$]')
+    ax2.axis([0.1, 30, 1e-3, 1e2])
+#    ax2.axis([0.1, 30, 1e-1/zsolar, 3e1/zsolar])
     ax2.set_xscale('log')
+    ax2.set_yscale('log')
 
     cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
     cb.set_label('Log Virial Mass [M$_\odot$]')
-    fig1.savefig(outfilebase + '_rhistmass_z.png')
+    fig2.show()
+    fig2.savefig(outfilebase + '_rhistmass_ratio.png')
 
     ax3.set_xlabel('Radius/R$_{vir}$')
     ax3.set_ylabel('Cumulative histogram of oxygen')
     ax3.axis([0.1, 20, 0, 1])
     ax3.set_xscale('log')
+    fig3.show()
     fig3.savefig(outfilebase + '_rhistox.png')
 
     ax4.set_xlabel('Radius/R$_{vir}$')
     ax4.set_ylabel('Cumulative histogram of iron')
     ax4.axis([0.1, 20, 0, 1])
     ax4.set_xscale('log')
+    fig4.show()
     fig4.savefig(outfilebase + '_rhistfe.png')
+
+    ax5.set_xlabel('Radius [kpc]')
+    ax5.set_ylabel('Cumulative histogram of gas')
+    ax5.axis([1, 3000, 0, 1])
+    ax5.set_xscale('log')
+  
+    ax5b.set_xlabel('Radius [kpc]')
+    ax5b.set_ylabel('Cumulative histogram of metals')
+    ax5b.axis([1, 3000, 0, 1])
+    ax5b.set_xscale('log')
+
+    cb = mpl.colorbar.ColorbarBase(ax5sub, cmap=cmx, norm=cNorm)
+    cb.set_label('Log Virial Mass [M$_\odot$]')
+    fig5.show()
+    fig5.savefig(outfilebase + '_rhistmass_z.png')
+

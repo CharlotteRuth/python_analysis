@@ -6,7 +6,7 @@
 #%run /home/christensen/Code/python/python_analysis/metalradii.py
 
 import matplotlib as mpl
-mpl.use('Agg') #This command ensures that the plots are not displayed, allowing it to work in parallel. Because of it, you can not run python with the --pylab option
+#mpl.use('Agg') #This command ensures that the plots are not displayed, allowing it to work in parallel. Because of it, you can not run python with the --pylab option
 import matplotlib.pylab as plt
 import matplotlib.mlab as mlab
 import matplotlib.colors as colors
@@ -53,7 +53,7 @@ def loadfiles(task):
 
     #Read in iords of all particles that have been in the halo
     disk_iord_file = pyfits.open(dirs + 'grp' + grp + '.reaccr_iord.fits')
-    #Include those particles that start off in the disk
+    #Include those particles that start off in the halo
     disk_early_iord_file = pyfits.open(dirs + 'grp' + grp + '.earlyhalo_iord.fits')
 
     disk_iord = disk_iord_file[0].data
@@ -63,7 +63,7 @@ def loadfiles(task):
     indicies = np.in1d(s.star['igasorder'],disk_iord) #Select for star particles in the main simulation that formed out of gas particles once in the disk/halo.
     disk_parts_star = s.star[np.nonzero(indicies)] #Note that multiple star particles can form from the same gas particle
     #Merge list of star formed from disk gas with list of all stars in halo at z = 0
-    iord_disk_parts_star = disk_parts_star['iord'] #stars formed out of gas that was in the disk
+    iord_disk_parts_star = disk_parts_star['iord'] #stars formed out of gas that was in the halo
     iord_halo_star = h.star['iord'] #stars in halo at z = 0
     iord_stars = np.concatenate((iord_disk_parts_star,iord_halo_star)) #concatenate arrays of iord
     temp, indices = np.unique(iord_stars, return_index=True) #remove duplicate stars
@@ -125,7 +125,7 @@ def loadfiles(task):
     indb = bsort[b_ind]
 
     # Debugging plot to make sure that z = 0 and exiting metallicities are reasonable similar
-    fig = plt.figure(6)
+    fig = plt.figure(7)
     temp = plt.hist2d(np.log10(np.array(disk_parts[inda]['metalMassFrac'])),np.log10(reoutflow_met_rev_uniq_out[indb]),bins = 400)
     plt.xlabel('log z = 0 Metallicity')
     plt.ylabel('log Metallicity when expelled')
@@ -174,9 +174,9 @@ def outflowImages(s,disk_parts,hrvir,outfilebase):
                     title='Outflow',show_cbar=True,vmin=1e16,vmax=1e22,
                     subplot = ax, cmap='ocean_r',noplot  = 1);
     sim_outflow = pp.sph.image(disk_parts.gas,
-                            units='m_p cm^-2', width=width, resolution = 500, clear=False,
-                            title='Outflow',show_cbar=True,vmin=1e16,vmax=1e22,
-                            subplot = ax, cmap='ocean_r');
+                    units='m_p cm^-2', width=width, resolution = 500, clear=False,
+                    title='Outflow',show_cbar=True,vmin=1e16,vmax=1e22,
+                    subplot = ax, cmap='ocean_r');
     circ=plt.Circle((0,0), radius = hrvir, color='b', fill=False)#,ec='black',fc='none')
     plt.contour(xarr,yarr,np.log10(sim),levels=[16,17,18,19,20,21,22],colors='k',)
     ax.add_patch(circ)
@@ -218,15 +218,48 @@ def pltZvsR(disk_parts,hrvir,outfilebase,color = 'k'):
 #disk_parts.gas['radius'] = sqrt(disk_parts.gas['x'].in_units('kpc')**2 + disk_parts.gas['y'].in_units('kpc')**2 + disk_parts.gas['z'].in_units('kpc')**2)
 #
 
+    #import code
+    #code.interact(local=locals())
+
     #Histogram of mass
     #hist, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass'])
     hist, bin_edges = np.histogram(disk_parts['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts['mass'])
     histcum = np.cumsum(hist)
+    hist_log, bin_edges_log = np.histogram(np.log10(disk_parts['rad']/hrvir), bins = 33, range=(-1,2.3), weights=disk_parts['mass'])
+    histcum_log = np.cumsum(hist_log)
     hist_g, bin_edges_g = np.histogram(disk_parts.gas['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.g['mass'])
     histcum_g = np.cumsum(hist_g)
     hist_s, bin_edges_s = np.histogram(disk_parts.star['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.s['mass'])
     histcum_s = np.cumsum(hist_s)
+  
+    #Histogram of Metals
+    histmet, bin_edges = np.histogram(disk_parts['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts['mass']*disk_parts['metalMassFrac'])
+    histcummet = np.cumsum(histmet)
+    histmet_log, bin_edges_log = np.histogram(np.log10(disk_parts['rad']/hrvir), bins = 33, range=(-1,2.3), weights=disk_parts['mass']*disk_parts['metalMassFrac'])
+    histcummet_log = np.cumsum(histmet_log)
+    histmet_g, bin_edges = np.histogram(disk_parts.gas['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['metalMassFrac'])
+    histcummet_g = np.cumsum(histmet_g)
+    histmet_s, bin_edges = np.histogram(disk_parts.star['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.star['mass']*disk_parts.star['metalMassFrac'])
+    histcummet_s = np.cumsum(histmet_s)
 
+    histox, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['OxMassFrac'])
+    histcumox = np.cumsum(histox)
+    histox_log, bin_edges_log = np.histogram(np.log10(disk_parts.gas['r']/hrvir), bins = 33, range=(-1,2.3), weights=disk_parts.gas['mass']*disk_parts.gas['OxMassFrac'])
+    histcumox_log = np.cumsum(histox_log)
+#    plt.plot((bin_edges[:-1] + bin_edges[1:])/2,histcumox/max(histcumox))
+
+    histfe, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['FeMassFrac'])
+    histcumfe = np.cumsum(histfe)
+    histfe_log, bin_edges_log = np.histogram(np.log10(disk_parts.gas['r']/hrvir), bins = 33, range=(-1,2.3), weights=disk_parts.gas['mass']*disk_parts.gas['FeMassFrac'])
+    histcumfe_log = np.cumsum(histfe_log)
+#    plt.plot((bin_edges[:-1] + bin_edges[1:])/2,histcumfe/max(histcumfe))
+
+    np.savetxt(outfilebase + '_rhistz.txt', np.c_[(bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum),histcummet/max(histcummet),histcumox/max(histcumox),histcumfe/max(histcumfe)])
+    np.savetxt(outfilebase + '_rhistz_log.txt', np.c_[(bin_edges_log[:-1] + bin_edges_log[1:])/2,histcum_log,histcummet_log,histcumox_log,histcumfe_log])
+
+    import code
+    code.interact(local=locals()) #use control-d to return to program
+    
     #plt.bar(bin_edges[:-1], hist, width = min(diff(bin_edges)))
     #plt.semilogy((bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum))
     fig1 = plt.figure(4)
@@ -237,15 +270,8 @@ def pltZvsR(disk_parts,hrvir,outfilebase,color = 'k'):
     ax1.set_xlabel('Radius/R_vir')
     ax1.set_ylabel('Cumulative histogram of gas')
     ax1.axis([0, 20, 0, 1])
+    fig1.show()
     fig1.savefig(outfilebase + '_rhistmass.png')
-  
-    #Histogram of Metals
-    histmet, bin_edges = np.histogram(disk_parts['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts['mass']*disk_parts['metalMassFrac'])
-    histcummet = np.cumsum(histmet)
-    histmet_g, bin_edges = np.histogram(disk_parts.gas['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['metalMassFrac'])
-    histcummet_g = np.cumsum(histmet_g)
-    histmet_s, bin_edges = np.histogram(disk_parts.star['rad']/hrvir, bins = 500, range=(0,max(disk_parts['rad']/hrvir)), weights=disk_parts.star['mass']*disk_parts.star['metalMassFrac'])
-    histcummet_s = np.cumsum(histmet_s)
 
     fig2 = plt.figure(5)
     ax2 = fig2.add_subplot(111)
@@ -255,20 +281,22 @@ def pltZvsR(disk_parts,hrvir,outfilebase,color = 'k'):
     ax2.set_xlabel('Radius/R_vir')
     ax2.set_ylabel('Cumulative histogram of metals')
     ax2.axis([0, 20, 0, 1])
+    fig2.show()
     fig2.savefig(outfilebase + '_rhistz.png')
 
-    histox, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['OxMassFrac'])
-    histcumox = np.cumsum(histox)
-#    plt.plot((bin_edges[:-1] + bin_edges[1:])/2,histcumox/max(histcumox))
-
-    histfe, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['FeMassFrac'])
-    histcumfe = np.cumsum(histfe)
-#    plt.plot((bin_edges[:-1] + bin_edges[1:])/2,histcumfe/max(histcumfe))
-
-    np.savetxt(outfilebase + '_rhistz.txt', np.c_[(bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum),histcummet/max(histcummet),histcumox/max(histcumox),histcumfe/max(histcumfe)])
-
+    fig3 = plt.figure(6)
+    ax3 = fig3.add_subplot(111)
+    ax3.plot((bin_edges_log[:-1] + bin_edges_log[1:])/2,histmet_log/hist_log/zsolar,color = color)
+    ax3.set_xlabel('log(Radius/R_vir)')
+    ax3.set_ylabel('Metallicity')
+    #ax3.axis([0, 20, 0, 1])
+    ax3.set_yscale('log')
+    fig3.show()
+    fig3.savefig(outfilebase + '_rhist_metallicity_log.png')
+    
 
 if __name__ == '__main__':
+    zsolar = 0.0130215
     prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
     finalstep = '00512'
 
@@ -310,20 +338,20 @@ if __name__ == '__main__':
     cNorm  = colors.Normalize(vmin=0, vmax=values[-1])
     scalarMap = cm.ScalarMappable(norm=cNorm, cmap=jet)
     #print scalarMap.get_clim()
-    
+       
     tasks = []
-    #for i in range(0,len(dirs)): 
-    for i in range(14,len(dirs)):   
+    for i in range(0,len(dirs)): 
+    #for i in range(15,len(dirs)):   
         tasks.append((dirs[i],files[i],haloid[i],finalstep))
 
-    
+    """
     pool = multiprocessing.Pool(processes=1,maxtasksperchild=1)
     results = pool.map_async(loadfiles,tasks)
     pool.close()
     pool.join()
-
     """
-    for i in range(10,len(dirs)-1):
+
+    for i in range(8,10): #range(0,1) range(0,len(dirs)-1):
         
         loadfiles(tasks[i])
         #colorVal = scalarMap.to_rgba(values[i])
@@ -333,7 +361,7 @@ if __name__ == '__main__':
         h = 0
         disk_parts = 0
         print 'Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-     """
+
        
 
 

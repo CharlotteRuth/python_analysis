@@ -102,7 +102,7 @@ if __name__ == '__main__':
     mtot_list = []
     mtot_list = [3.2e9, 4.4e9, 4.4e9, 6.8e9, 1.1e10,1.1e10,1.2e10,1.5e10,2.4e10,2.9e10,3.4e10,3.8e10,3.8e10,5.9e10,1.0e11,1.9e11,3.4e11,7.7e11,8.8e11,9.1e11]
 
-    for i in reversed(range(0,10)): #len(dirs))):
+    for i in reversed(range(0,len(dirs))):
         #tfile = dirs[i] + files[i] + '.' + '00512' + '/' + files[i] + '.' + '00512'
         #s = pynbody.load(tfile)
         #hs = s.halos()       
