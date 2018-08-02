@@ -4,7 +4,8 @@
 
 #Run with
 #%run /home/christensen/Code/python/python_analysis/metalradiihist.py
-
+#or, on quirm,
+#%run /home/christenc/Code/python/python_analysis/metalradiihist.py
 
 import matplotlib as mpl
 import matplotlib.pylab as plt
@@ -21,14 +22,21 @@ from mpl_toolkits.mplot3d import Axes3D
 import pynbody
 import pynbody.plot as pp
 import pynbody.snapshot.tipsy
-import pyfits
+#import astropy.io.fits as fits
 import sys, os, glob, pynbody.bridge
 import time
+import socket
 #import matplotlib_ref_density
 
 if __name__ == '__main__':
+    plt.style.use('default')
     zsolar = 0.0130215
-    prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
+    if (socket.gethostname() == "quirm"):
+        prefix = '/home/christenc/Data/Sims/'
+        outplotbase = '/home/christenc/Figures/outflowz/hgal'
+    else:
+        prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
+        outplotbase = '/home/christensen/Plots/outflowz_images/hgal'
     finalstep = '00512'
 
     dir799 = prefix + 'h799.cosmo25cmb.3072g/h799.cosmo25cmb.3072g14HBWK/'
@@ -88,6 +96,11 @@ if __name__ == '__main__':
     #    histfe, bin_edges = np.histogram(disk_parts.gas['r']/hrvir, bins = 500, range=(0,max(disk_parts.gas['r']/hrvir)), weights=disk_parts.gas['mass']*disk_parts.gas['FeMassFrac'])
     #    histcumfe = np.cumsum(histfe)
 
+    mpl.rcParams['xtick.major.size'] = 6
+    mpl.rcParams['xtick.minor.size'] = 3
+    mpl.rcParams['ytick.major.size'] = 6
+    mpl.rcParams['ytick.minor.size'] = 3    
+
     fig1 = plt.figure(1,figsize=(14,4))
     fig2 = plt.figure(2)
     fig3 = plt.figure(3)
@@ -105,7 +118,7 @@ if __name__ == '__main__':
     ax5 = fig5.add_subplot(gs[0])
     ax5b = fig5.add_subplot(gs[1])
     ax5sub = fig5.add_subplot(gs[2])
-
+    
     first = ax1.plot([1,1],[0,1],linestyle = '--',color = 'k') #,cmap = cm_rainbow)
     ax1b.plot([1,1],[0,1],linestyle = '--',color = 'k')
     ax2.plot([1,1],[0,1e3*zsolar],linestyle = '--',color = 'k')
@@ -117,7 +130,78 @@ if __name__ == '__main__':
     mtot_list = []
     mtot_list = [3.2e9, 4.4e9, 4.4e9, 6.8e9, 1.1e10,1.1e10,1.2e10,1.5e10,2.4e10,2.9e10,3.4e10,3.8e10,3.8e10,5.9e10,1.0e11,1.9e11,3.4e11,7.7e11,8.8e11,9.1e11]
 
-    for i in reversed(range(0,14)): #len(dirs))):
+    ax1.set_xlabel(r'R/R$_{vir}$')
+    ax1.set_ylabel(r'$M_{\mathrm{baryon}} (< R)/M_{\mathrm{baryon}}$')
+    ax1.axis([0.1, 10, 0.1, 1])
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax1.yaxis.set_minor_formatter(plt.NullFormatter())
+    ax1.tick_params(which='both',right=True,top=True)
+  
+    ax1b.set_xlabel(r'Radius/R$_{vir}$')
+    ax1b.set_ylabel(r'$M_{\mathrm{Z}} (< R)/M_{\mathrm{Z}}$')
+    ax1b.axis([0.1, 10, 0.1, 1])    
+    ax1b.axis([0.1, 10, 0.1, 1])
+    ax1b.set_xscale('log')
+    ax1b.set_yscale('log')
+    ax1b.yaxis.set_minor_formatter(plt.NullFormatter())
+    ax1b.tick_params(which='both',right=True,top=True)
+
+    cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
+    cb.set_label('Log Virial Mass [M$_\odot$]')
+    fig1.tight_layout()
+
+    ax2.set_xlabel(r'R/R$_{vir}$')
+    ax2.set_ylabel(r'Metallicity [Z/Z$_{\odot}$]')
+    ax2.axis([0.1, 30, 1e-3, 2])
+#    ax2.axis([0.1, 30, 1e-1/zsolar, 3e1/zsolar])
+    ax2.set_xscale('log')
+    ax2.set_yscale('log')
+    ax2.tick_params(which='both',right=True,top=True)
+
+    cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
+    cb.set_label('Log Virial Mass [M$_\odot$]')
+    fig2.tight_layout()
+    
+    ax3.set_xlabel(r'R/R$_{vir}$')
+    ax3.set_ylabel(r'Cumulative histogram of oxygen')    
+    ax3.axis([0.1, 10, 0.1, 1])
+    ax3.set_xscale('log')
+    ax3.set_yscale('log')
+    ax3.tick_params(which='both',right=True,top=True)
+    fig3.tight_layout()
+    
+    ax4.set_xlabel(r'R/R$_{vir}$')
+    ax4.set_ylabel(r'Cumulative histogram of iron')
+    ax4.axis([0.1, 10, 0.1, 1])
+    ax4.set_xscale('log')
+    ax4.set_yscale('log')    
+    ax4.tick_params(which='both',right=True,top=True)
+    fig4.tight_layout()
+    
+    ax5.set_xlabel(r'Radius [kpc]')
+    ax5.set_ylabel(r'$M_{\mathrm{baryon}} (< R)/M_{\mathrm{baryon}}$')
+    #ax5.plot([1,1],[0.1,1],color = colorVal,linestyle = '-',lw = 2)
+    ax5.axis([1, 300, 0.1, 1])
+    ax5.set_xscale('log')
+    ax5.set_yscale('log')
+    ax5.yaxis.set_minor_formatter(plt.NullFormatter()) 
+    ax5.tick_params(which='both',right=True,top=True)
+
+    ax5b.set_xlabel(r'Radius [kpc]')
+    ax5b.set_ylabel(r'$M_{\mathrm{Z}} (< R)/M_{\mathrm{Z}}$')
+    #ax5.plot([1,1],[0.1,1],color = colorVal,linestyle = '-',lw = 2)
+    ax5b.axis([1, 300, 0.1, 1])
+    ax5b.set_xscale('log')
+    ax5b.set_yscale('log')
+    ax5b.yaxis.set_minor_formatter(plt.NullFormatter())
+    ax5b.tick_params(which='both',right=True,top=True)
+
+    cb = mpl.colorbar.ColorbarBase(ax5sub, cmap=cmx, norm=cNorm)
+    cb.set_label('Log Virial Mass [M$_\odot$]')
+    fig5.tight_layout()
+    
+    for i in reversed(range(0,len(dirs))):
         #tfile = dirs[i] + files[i] + '.' + '00512' + '/' + files[i] + '.' + '00512'
         #s = pynbody.load(tfile)
         #hs = s.halos()       
@@ -128,13 +212,17 @@ if __name__ == '__main__':
         #'h285.4' 'h516.1''h986.3' 'h986.2' 'h603.2' 'h986.1''h603.1' 'h258.1''h285.1' 'h239.1'
 
         outfilebase = dirs[i] + files[i] + '.grp' + haloid[i]
-        data = np.loadtxt(outfilebase + '_rhistz.txt')
-        data_log =  np.loadtxt(outfilebase + '_rhistz_log.txt')
+        #data = np.loadtxt(outfilebase + '_rhistz.txt') #Using metallicity when exiting the halo
+        #data_log =  np.loadtxt(outfilebase + '_rhistz_log.txt')
+        data = np.loadtxt(outfilebase + '_rhistz_disk.txt') #Using metallicity when exiting the disk
+        data_log =  np.loadtxt(outfilebase + '_rhistz_disk_log.txt')        
         print(outfilebase)
         colorVal = scalarMap.to_rgba(np.log10(mtot_list[i])) #values[i])
         #linecolor = (alog10(mtot_t) - 9.5)/2.5
         masshist = np.subtract(data_log[:,1], np.append([0],data_log[0:-1,1]))
         metalhist = np.subtract(data_log[:,2], np.append([0],data_log[0:-1,2]))
+        ind, = np.where(data[:,0]*rvir[i] <= 300)
+        data = data[ind,:]
         ax1.plot(data[:,0],data[:,1],color = colorVal,linestyle = '-',lw = 2)
         ax1b.plot(data[:,0],data[:,2],color = colorVal,linestyle = '-',lw = 2)
         ax2.plot(10**data_log[:,0],metalhist/masshist/zsolar,color = colorVal,linestyle = '-',lw = 2)
@@ -145,62 +233,26 @@ if __name__ == '__main__':
         ax5.plot(data[:,0]*rvir[i],data[:,1],color = colorVal,linestyle = '-',lw = 2)
         ax5b.plot(data[:,0]*rvir[i],data[:,2],color = colorVal,linestyle = '-',lw = 2)
         print(data[14,2]) #1 virial radii
-#        print(data[240,2]) #17.5 virial radii
+        #print(data[240,2]) #17.5 virial radii
+        fig1.show()
+        fig2.show()
+        fig3.show()
+        fig4.show()
+        fig5.show()
 
-    outfilebase = '/home/christensen/Plots/outflowz_images/hgal'
-    ax1.set_xlabel('Radius/R$_{vir}$')
-    ax1.set_ylabel('Cumulative histogram of gas')
-    ax1.axis([0.1, 30, 0, 1])
-    ax1.set_xscale('log')
-  
-    ax1b.set_xlabel('Radius/R$_{vir}$')
-    ax1b.set_ylabel('Cumulative histogram of metals')
-    ax1b.axis([0.1, 30, 0, 1])
-    ax1b.set_xscale('log')
 
-    cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
-    cb.set_label('Log Virial Mass [M$_\odot$]')
     fig1.show()
-    fig1.savefig(outfilebase + '_rhistmass_z.png')
+    fig1.savefig(outplotbase + '_rhistmass_z_rvir.png')
 
-    ax2.set_xlabel('Radius/R$_{vir}$')
-    ax2.set_ylabel('Metallicity [Z/Z$_{\odot}$]')
-    ax2.axis([0.1, 30, 1e-3, 1e2])
-#    ax2.axis([0.1, 30, 1e-1/zsolar, 3e1/zsolar])
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-
-    cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
-    cb.set_label('Log Virial Mass [M$_\odot$]')
     fig2.show()
-    fig2.savefig(outfilebase + '_rhistmass_ratio.png')
+    fig2.savefig(outplotbase + '_rhistmass_ratio.png')
 
-    ax3.set_xlabel('Radius/R$_{vir}$')
-    ax3.set_ylabel('Cumulative histogram of oxygen')
-    ax3.axis([0.1, 20, 0, 1])
-    ax3.set_xscale('log')
     fig3.show()
-    fig3.savefig(outfilebase + '_rhistox.png')
+    fig3.savefig(outplotbase + '_rhistox.png')
 
-    ax4.set_xlabel('Radius/R$_{vir}$')
-    ax4.set_ylabel('Cumulative histogram of iron')
-    ax4.axis([0.1, 20, 0, 1])
-    ax4.set_xscale('log')
     fig4.show()
-    fig4.savefig(outfilebase + '_rhistfe.png')
+    fig4.savefig(outplotbase + '_rhistfe.png')
 
-    ax5.set_xlabel('Radius [kpc]')
-    ax5.set_ylabel('Cumulative histogram of gas')
-    ax5.axis([1, 3000, 0, 1])
-    ax5.set_xscale('log')
-  
-    ax5b.set_xlabel('Radius [kpc]')
-    ax5b.set_ylabel('Cumulative histogram of metals')
-    ax5b.axis([1, 3000, 0, 1])
-    ax5b.set_xscale('log')
-
-    cb = mpl.colorbar.ColorbarBase(ax5sub, cmap=cmx, norm=cNorm)
-    cb.set_label('Log Virial Mass [M$_\odot$]')
     fig5.show()
-    fig5.savefig(outfilebase + '_rhistmass_z.png')
+    fig5.savefig(outplotbase + '_rhistmass_z.png')
 

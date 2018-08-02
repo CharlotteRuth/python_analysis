@@ -4,6 +4,8 @@
 
 #Run with
 #%run /home/christensen/Code/python/python_analysis/metalradii.py
+#or, on quirm,
+#%run /home/christenc/Code/python/python_analysis/metalradii.py
 
 import matplotlib as mpl
 #mpl.use('Agg') #This command ensures that the plots are not displayed, allowing it to work in parallel. Because of it, you can not run python with the --pylab option
@@ -20,9 +22,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import pynbody
 import pynbody.plot as pp
 import pynbody.snapshot.tipsy
-import pyfits
+import astropy.io.fits as fits
 import sys, os, glob, pynbody.bridge
 import time
+import socket
 
 def loadfiles(task):
 #Load an individual simulation
@@ -37,10 +40,10 @@ def loadfiles(task):
     hs = s.halos()       
     h = hs[int(grp)]
     print("halos loaded")
-    pynbody.analysis.halo.center(h,mode='com') #not as accurate as hyb but saves memory and time
+    pynbody.analysis.halo.center(h,mode='com',vel= False) #not as accurate as hyb but saves memory and time
     print("halo center of mass")
-    pynbody.analysis.angmom.sideon(h)
-    print("halo aligned")
+    #pynbody.analysis.angmom.sideon(h)
+    #print("halo aligned")
     hrvir = np.max(h.gas['r'])   
    
     print("Read in .fits files")
@@ -52,9 +55,9 @@ def loadfiles(task):
     """
 
     #Read in iords of all particles that have been in the halo
-    disk_iord_file = pyfits.open(dirs + 'grp' + grp + '.reaccr_iord.fits')
+    disk_iord_file = fits.open(dirs + 'grp' + grp + '.reaccr_iord.fits')
     #Include those particles that start off in the halo
-    disk_early_iord_file = pyfits.open(dirs + 'grp' + grp + '.earlyhalo_iord.fits')
+    disk_early_iord_file = fits.open(dirs + 'grp' + grp + '.earlyhalo_iord.fits')
 
     disk_iord = disk_iord_file[0].data
     disk_early_iord = disk_early_iord_file[0].data
@@ -81,13 +84,13 @@ def loadfiles(task):
     disk_parts['rad'] = np.sqrt(disk_parts['x']**2 + disk_parts['y']**2 + disk_parts['z']**2)
  
     # Goal: for any particle that is out of the halo at z = 0, use its metallicity at the time it left the halo, rather than its current metallicity
-    reoutflow_iord_file = pyfits.open(dirs + 'grp' + grp + '.reoutflow_iord.fits') #All gas that exited the disk after having been in it
+    reoutflow_iord_file = fits.open(dirs + 'grp' + grp + '.reoutflow_iord.fits') #All gas that exited the disk after having been in it
     reoutflow_iord = reoutflow_iord_file[0].data
     reoutflow_iord_rev = reoutflow_iord[::-1]
     temp, indices = np.unique(reoutflow_iord_rev, return_index=True) #indicies corresponding to unique outflow particles
     reoutflow_iord_rev_uniq = reoutflow_iord_rev[indices]
 
-    reoutflow_met_file = pyfits.open(dirs + 'grp' + grp + '.reoutflow_history.fits')
+    reoutflow_met_file = fits.open(dirs + 'grp' + grp + '.reoutflow_history.fits')
     reoutflow_met = reoutflow_met_file[1].data['metallicity']
     reoutflow_met_rev = reoutflow_met[::-1]
     reoutflow_met_rev_uniq = reoutflow_met_rev[indices]
@@ -96,10 +99,15 @@ def loadfiles(task):
     indicies = np.in1d(reoutflow_iord_rev_uniq,s['iord'])
     reoutflow_iord_rev_uniq = reoutflow_iord_rev_uniq[np.nonzero(indicies)] #Only those particles that are gasous at z = 0
     reoutflow_met_rev_uniq = reoutflow_met_rev_uniq[np.nonzero(indicies)]
-    indicies = np.in1d(reoutflow_iord_rev_uniq,h['iord'],invert = 1) #only those particles that are not in the halo
-    reoutflow_iord_rev_uniq_out = reoutflow_iord_rev_uniq[np.nonzero(indicies)]
-    reoutflow_met_rev_uniq_out = reoutflow_met_rev_uniq[np.nonzero(indicies)]
-
+    #Choice of whether adjusting the metallicities of those particles not in the disk or only those particles not in the halo.
+    if 0:
+        indicies = np.in1d(reoutflow_iord_rev_uniq,h['iord'],invert = 1) #only those particles that are not in the halo    
+        reoutflow_iord_rev_uniq_out = reoutflow_iord_rev_uniq[np.nonzero(indicies)]
+        reoutflow_met_rev_uniq_out = reoutflow_met_rev_uniq[np.nonzero(indicies)]
+    else:
+        reoutflow_iord_rev_uniq_out = reoutflow_iord_rev_uniq
+        reoutflow_met_rev_uniq_out = reoutflow_met_rev_uniq
+        
     #Select all particles that were in the halo but then leave it
     #to make sure that all gas particles in outflow were once accreted (debugging)
     disk_iord_uniq = np.unique(disk_iord)
@@ -136,7 +144,7 @@ def loadfiles(task):
     #Make images
     outfilebase = dirs + files + '.grp' + grp
     print('Disk particles selected, now write to ' + outfilebase)
-    #outflowImages(s,disk_parts,hrvir,outfilebase)
+    outflowImages(s,disk_parts,hrvir,outfilebase)
     pltZvsR(disk_parts,hrvir,outfilebase)
     print 'Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     tend = time.clock()
@@ -254,11 +262,11 @@ def pltZvsR(disk_parts,hrvir,outfilebase,color = 'k'):
     histcumfe_log = np.cumsum(histfe_log)
 #    plt.plot((bin_edges[:-1] + bin_edges[1:])/2,histcumfe/max(histcumfe))
 
-    np.savetxt(outfilebase + '_rhistz.txt', np.c_[(bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum),histcummet/max(histcummet),histcumox/max(histcumox),histcumfe/max(histcumfe)])
-    np.savetxt(outfilebase + '_rhistz_log.txt', np.c_[(bin_edges_log[:-1] + bin_edges_log[1:])/2,histcum_log,histcummet_log,histcumox_log,histcumfe_log])
+    np.savetxt(outfilebase + '_rhistz_disk.txt', np.c_[(bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum),histcummet/max(histcummet),histcumox/max(histcumox),histcumfe/max(histcumfe)])
+    np.savetxt(outfilebase + '_rhistz_disk_log.txt', np.c_[(bin_edges_log[:-1] + bin_edges_log[1:])/2,histcum_log,histcummet_log,histcumox_log,histcumfe_log])
 
-    import code
-    code.interact(local=locals()) #use control-d to return to program
+    #import code
+    #code.interact(local=locals()) #use control-d to return to program
     
     #plt.bar(bin_edges[:-1], hist, width = min(diff(bin_edges)))
     #plt.semilogy((bin_edges[:-1] + bin_edges[1:])/2,histcum/max(histcum))
@@ -297,7 +305,10 @@ def pltZvsR(disk_parts,hrvir,outfilebase,color = 'k'):
 
 if __name__ == '__main__':
     zsolar = 0.0130215
-    prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
+    if (socket.gethostname() == "quirm"):
+        prefix = '/home/christenc/Data/Sims/'
+    else:
+        prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
     finalstep = '00512'
 
     dir799 = prefix + 'h799.cosmo25cmb.3072g/h799.cosmo25cmb.3072g14HBWK/'
@@ -351,7 +362,7 @@ if __name__ == '__main__':
     pool.join()
     """
 
-    for i in range(8,10): #range(0,1) range(0,len(dirs)-1):
+    for i in range(5,6): #(15,len(dirs)): #range(0,1) range(0,len(dirs)):
         
         loadfiles(tasks[i])
         #colorVal = scalarMap.to_rgba(values[i])

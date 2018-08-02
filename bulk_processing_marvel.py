@@ -46,7 +46,7 @@ def bulk_processing(tfile,halo_nums):
         rvir = pynbody.array.SimArray(np.sqrt(np.max(halo_ahf['x'].in_units('kpc')**2 + halo_ahf['y'].in_units('kpc')**2 + halo_ahf['z'].in_units('kpc')**2)),'kpc')
         halo = s[pynbody.filt.Sphere(rvir, (0,0,0))]
         
-        stars = halo.star
+        stars = halo_ahf.star
         stars.physical_units()
 
         #For calculating HI and halo mass
@@ -65,11 +65,11 @@ def bulk_processing(tfile,halo_nums):
         
         #For calculating the metallicity
 
-        minmetal = np.amin(stars['metals'][np.where(stars['metals'] > 0)])
-        stars['metals'][np.where(stars['metals'] == 0)] = minmetal
+        minmetal = np.amin(s.stars['metals'][np.where(s.stars['metals'] > 0)])
+        s.stars['metals'][np.where(s.stars['metals'] == 0)] = minmetal
 
         #For stellar half-mass raidus
-        profile_stellar = pynbody.analysis.profile.Profile(stars,ndin = 2,min = 0, max = np.ceil(rvir), nbins = int(np.ceil(rvir)/0.1))
+        profile_stellar = pynbody.analysis.profile.Profile(stars,ndin = 2,min = 0, max = np.ceil(rvir), nbins = int(np.ceil(rvir)/0.01))
         index = np.argmin(np.abs(profile_stellar['mass_enc']/max(profile_stellar['mass_enc']) - 0.5))
         r_half = profile_stellar['rbins'].in_units('kpc')[index]
 
@@ -112,11 +112,17 @@ def bulk_processing(tfile,halo_nums):
              'mwarm': np.sum(warm['mass'].in_units('Msol')),
              'mCool': np.sum(cool['mass'].in_units('Msol')),
              'mHot': np.sum(hot['mass'].in_units('Msol')),
+             'mZISM':  np.sum(ISM['mass'].in_units('Msol')*ISM['metals']),
+             'mZwarm': np.sum(warm['mass'].in_units('Msol')*warm['metals']),
+             'mZCool': np.sum(cool['mass'].in_units('Msol')*cool['metals']),
+             'mZHot': np.sum(hot['mass'].in_units('Msol')*hot['metals']),
+             'mZstar': np.sum(stars['mass'].in_units('Msol')*stars['metals']),
              'mwarm_coolon': mwarm_coolon,
              'mCool_coolon': mCool_coolon,
              'mHot_coolon': mHot_coolon,
              'mHI':   mHI,
              'mstar': np.sum(halo.star['mass'].in_units('Msol')),
+             'mstarform': np.sum(halo.star['massform'].in_units('Msol')),
              'vmax':  h[int(halo_num)].properties['Vmax'],
              'FeH_mean': np.mean(stars['feh']), #Note that this is the mean of a log
              'FeH_std': np.std(stars['feh']),  #Note that this is a standard deviation of a log
@@ -156,39 +162,44 @@ if __name__ == '__main__':
     tfile_name = 'h148.cosmo50PLK.3072g3HbwK1BH.004096'
     tfile = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
     halo_nums = ['1','2','3','5','6','9','10','11','12','14','18','23','26','28','31','34','36','42','57','64','77','94','125','160','252','264','271','304']
-    #bulk_processing(tfile,halo_nums)
+    bulk_processing(tfile,halo_nums)
     
     tfile_name = 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     halo_nums = ['1','9','32','126','129']
-    #bulk_processing(tfile,halo_nums)
+    bulk_processing(tfile,halo_nums)
     
     tfile_name = 'h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     halo_nums = ['1','2','4','7','17','21','22','27','51','52','70','104','203']
-    #bulk_processing(tfile,halo_nums)
+    bulk_processing(tfile,halo_nums)
     
     tfile_name = 'h242.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'      
     halo_nums = ['1','9','11','24','29','30','33','39','40','45','75','76']
-    #bulk_processing(tfile,halo_nums)
+    bulk_processing(tfile,halo_nums)
         
     tfile = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     halo_nums = ['1','2','4','5','6','7','10','11','13','14','27']
-    #bulk_processing(tfile,halo_nums)
+    bulk_processing(tfile,halo_nums) #yield: 0.02788242
     
-    halo_nums = ['1','3','7','8','10','11','12','16','17','18','30','32','34','36','61','123']
+    halo_nums = ['1','3','7','8','10','11','12','16','17','18','30','34','36']
     tfile = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'rogue.cosmo25cmb.4096g5HbwK1BH.004096'
-    bulk_processing(tfile,halo_nums)
+    bulk_processing(tfile,halo_nums) #yield: 0.02706356
 
     tfile = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'elektra.cosmo25cmb.4096g5HbwK1BH.004096'
-    halo_nums = ['1','2','3','4','5','8','9','10','11','12','17','18','37','75']
-    bulk_processing(tfile,halo_nums)
+    halo_nums = ['1','2','3','4','5','9','10','11','12','17','18','37']
+    bulk_processing(tfile,halo_nums) #yield: 0.02773383
 
     tfile = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'storm.cosmo25cmb.4096g5HbwK1BH'
-    halo_nums = ['1','2','3','4','5','6','7','8','10','11','13','14','15','16','17','23','24','28','34','35','43','49','50','60','109','124','125','192','208']   
-    bulk_processing(tfile,halo_nums)
+    halo_nums = ['1','2','3','4','5','6','7','8','10','11','13','14','16','17','24','34','35','49','109','125','192','208']   
+    bulk_processing(tfile,halo_nums) #yield: 0.02758432
+
+    tfile = prefix + 'h986.cosmo50cmb.3072g/h986.cosmo50cmb.3072g14HBWK/h986.cosmo50cmb.3072g14HBWK.00512/h986.cosmo50cmb.3072g14HBWK.00512'
+    tfile_name = 'h986.cosmo50cmb.3072g14HBWK'
+    halo_nums = ['1','2','3','8','15','16']
+    #bulk_processing(tfile,halo_nums)

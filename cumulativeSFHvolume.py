@@ -4,7 +4,7 @@
 #Calculate and plot the cumulative star formation histories of every halo above a given mass range in a simulation volume
 
 #%run /home/christenc/Code/python/python_analysis/cumulativeSFHvolume
-
+import matplotlib as mpl
 import matplotlib.pylab as plt
 import matplotlib.mlab as mlab
 import matplotlib.colors as colors
@@ -13,9 +13,24 @@ import pynbody
 import math
 import numpy as np
 import socket
+import matplotlib.gridspec as gridspec
 
-def cumulativeSFHvolume(tfile,outfilebase,tfile_base,*halo_nums):
-
+def cumulativeSFHvolume(tfile,outfile_base,tfile_base,*halo_nums):
+    presentation = True
+    if presentation:
+        outfile_base = outfile_base + '_pres'
+        plt.style.use(['default','/home/christenc/.config/matplotlib/presentation.mplstyle'])
+        plt_width = 8 #inches
+        aspect_ratio = 3.0/4.0
+        legendsize = 16
+        dpi = 100
+    else:
+        plt.style.use(['default','/home/christenc/.config/matplotlib/article.mplstyle'])
+        plt_width = 3.5 #inches
+        aspect_ratio = 3.0/4.0
+        legendsize = 5
+        dpi = 300
+    
     #min_mass = 1e9 #Minimum halo mass for analysis in solar masses
     min_nstar =  100 #Minimum number of stars for
     min_vmass = 1e8
@@ -31,8 +46,9 @@ def cumulativeSFHvolume(tfile,outfilebase,tfile_base,*halo_nums):
     h = s.halos()
     h_dummy = s.halos(dummy = True)
 
-    mass_color_scale = 0    
+    mass_color_scale = 1    
     if mass_color_scale:
+        outfile_base = outfile_base + '_masscolor'
         cmx = plt.get_cmap("viridis_r") 
         #values = range(0,20)
         #cNorm  = colors.Normalize(vmin=0, vmax = values[-1]+1)
@@ -45,11 +61,19 @@ def cumulativeSFHvolume(tfile,outfilebase,tfile_base,*halo_nums):
         values = range(0,20)
         cNorm  = colors.Normalize(vmin=0, vmax = values[-1]+1)
         scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmx)
-    
-    fig1 = plt.figure(1)
-    fig2 = plt.figure(2)
-    ax1 = fig1.add_subplot(111)
-    ax2 = fig2.add_subplot(111)
+
+        
+    fig1 = plt.figure(1,figsize=(plt_width,plt_width*aspect_ratio))
+    fig2 = plt.figure(2,figsize=(plt_width,plt_width*aspect_ratio))
+    if mass_color_scale:
+        gs =  gridspec.GridSpec(1,2,width_ratios=[15,1])
+        ax1 = fig1.add_subplot(gs[0])
+        ax1sub = fig1.add_subplot(gs[1])
+        ax2 = fig2.add_subplot(gs[0])
+        ax2sub = fig2.add_subplot(gs[1])
+    else:
+        ax1 = fig1.add_subplot(111)
+        ax2 = fig2.add_subplot(111)
     
     labels = []
 
@@ -83,25 +107,35 @@ def cumulativeSFHvolume(tfile,outfilebase,tfile_base,*halo_nums):
             i += 1
             
     ax1.set_xlabel('Time [Gyr]')
-    ax1.set_ylabel('M$_\odot$ yr$^{-1}$')
+    ax1.set_ylabel(r'M$_\odot$ yr$^{-1}$')
     #ax1.axis([0.1, 20, 0, 1])
     #ax1.set_xscale('log')
-    ax1.set_title(tfile_base)
-    ax1.legend(labels,loc = 1)
+    #ax1.set_title(tfile_base)
+    if mass_color_scale:
+        cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
+        cb.set_label('Log Virial Mass [M$_\odot$]')
+    else:
+        ax1.legend(labels,loc = 1)
+    plt.tight_layout()
     fig1.show()
-    fig1.savefig(outfilebase + '.sfh.png')
+    fig1.savefig(outfile_base + '_sfh.png',dpi = dpi)
 
     fig1.clear()
 
     
     ax2.set_xlabel('Time [Gyr]')
-    ax2.set_ylabel('Normalized Cumulative History of Star Formation')
+    ax2.set_ylabel(r'$M_*( t_{form} < t)/M_*$')
     ax2.axis([0, 13.7, 0, 1])
-    ax2.set_title(tfile_base)
-    ax2.legend(labels,loc = 4)
+    #ax2.set_title(tfile_base)
+    if mass_color_scale:
+        cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
+        cb.set_label('Log Virial Mass [M$_\odot$]')
+    else:
+        ax2.legend(labels,loc = 4)
     #ax2.set_xscale('log')
+    plt.tight_layout()
     fig2.show()
-    fig2.savefig(outfilebase + '.sfhcum.png')
+    fig2.savefig(outfile_base + '_sfhcum.png',dpi = dpi)
 
     fig2.clear()
         
@@ -118,43 +152,43 @@ if __name__ == '__main__':
     tfile_base = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH'
     tfile = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096' #'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     outfile_base = prefix_outfile + tfile_base
-    #cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
+    cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
 
     halo_nums = ['1','3','7','8','10','11','12','16','17','18','30','32','34','36','61','123']
     tfile = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base = 'rogue.cosmo25cmb.4096g5HbwK1BH'
     outfile_base = prefix_outfile + tfile_base
-    #cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
+    cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
 
     halo_nums = ['1','2','3','4','5','8','9','10','11','12','17','18','37','75']
     tfile = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base = 'elektra.cosmo25cmb.4096g5HbwK1BH'
     outfile_base = prefix_outfile + tfile_base
-    #cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
+    cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
 
     halo_nums = ['1','2','3','4','5','6','7','8','10','11','13','14','15','16','17','23','24','28','34','35','43','49','50','60','109','124','125','192','208'] 
     tfile = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base = 'storm.cosmo25cmb.4096g5HbwK1BH'
     outfile_base = prefix_outfile + tfile_base
-    #cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
+    cumulativeSFHvolume(tfile,outfile_base,tfile_base,halo_nums)
     
     tfile_base = 'h148.cosmo50PLK.3072g3HbwK1BH'
     tfile = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'    
     outfile_base = prefix_outfile + tfile_base
-    cumulativeSFHvolume(tfile,outfile_base,tfile_base)
+    #cumulativeSFHvolume(tfile,outfile_base,tfile_base)
      
     tfile_base = 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     outfile_base = prefix_outfile + tfile_base
-    cumulativeSFHvolume(tfile,outfile_base,tfile_base)
+    #cumulativeSFHvolume(tfile,outfile_base,tfile_base)
     
     tfile_base = 'h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'    
     outfile_base = prefix_outfile + tfile_base
-    cumulativeSFHvolume(tfile,outfile_base,tfile_base)
+    #cumulativeSFHvolume(tfile,outfile_base,tfile_base)
     
     tfile_base = 'h242.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'
     outfile_base = prefix_outfile + tfile_base
-    cumulativeSFHvolume(tfile,outfile_base,tfile_base)
+    #cumulativeSFHvolume(tfile,outfile_base,tfile_base)
 
