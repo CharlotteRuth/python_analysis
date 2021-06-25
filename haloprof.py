@@ -102,9 +102,9 @@ def haloprof_cumplot(tfile,halo_nums,halotype = 'all',normalize = False):
         scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmx)
         if (os.path.isfile(tfile + "_" + halo_num + "_halo" + ".data") == True):
             p_gas = pickle_read(tfile + "_" + halo_num + "_halo" + ".data")
-            mass_norm = h[int(halo_num)].properties['mass']*f_bar
-            Z_norm = np.sum(h[int(halo_num)].star['massform'].in_units('Msol'))*Zyield
-            colorVal = scalarMap.to_rgba(np.log10(h[int(halo_num)].properties['mass']))
+            mass_norm = float(halo_data[halo_data['haloid'] == halo_num]['mvir'])*f_bar #h[int(halo_num)].properties['mass']*f_bar
+            Z_norm = float(halo_data[halo_data['haloid'] == halo_num]['mstarform'])*Zyield #np.sum(h[int(halo_num)].star['massform'].in_units('Msol'))*Zyield
+            colorVal = scalarMap.to_rgba(np.log10(float(halo_data[halo_data['haloid'] == halo_num]['mvir'])))
             if (halotype == 'all'):
                 axs[0].plot(p_gas['rrvir'][0],p_gas['mass_enc'][0]/mass_norm, color = colorVal)
                 axs[1].plot(p_gas['rrvir'][0],p_gas['metals_enc'][0]/Z_norm, color = colorVal)
@@ -190,7 +190,7 @@ def haloprof(tfile,halo_nums):
 
 
 if __name__ == '__main__':    
-    if (socket.gethostname() == "quirm"):
+    if (socket.gethostname() == "quirm.math.grinnell.edu"):
         prefix = '/home/christenc/Data/Sims/'
         prefix_outfile = '/home/christenc/Figures/marvel/'
     else:
@@ -201,17 +201,18 @@ if __name__ == '__main__':
     tfile_cm = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name_cm = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     
-    halo_nums_r = ['1','3','7','8','10','11','12','16','17','18','30','32','34','36','61','123']
+    halo_nums_r = ['1','3','7','8','10','11','12','16','17','18','34','36']#,'61','123']
     tfile_r = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name_r = 'rogue.cosmo25cmb.4096g5HbwK1BH.004096'
 
     tfile_e = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name_e = 'elektra.cosmo25cmb.4096g5HbwK1BH.004096'
-    halo_nums_e = ['1','2','3','4','5','8','9','10','11','12','17','18','37','75']
+    halo_nums_e = ['1','2','3','4','5','9','10','11','12','17','18','37']#,'75']
 
     tfile_s = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name_s = 'storm.cosmo25cmb.4096g5HbwK1BH'
-    halo_nums_s = ['1','2','3','4','5','6','7','8','10','11','13','14','15','16','17','23','24','28','34','35','43','49','50','60','109','124','125','192','208']   
+    halo_nums_s = ['1','2','3','4','5','6','7','8','10','11','13','14','16','17','24','34','35','49','109','125','192','208']
+    #             ['1','2','3','4','5','6','7','8','10','11','13','14','15','16','17','23','24','28','34','35','43','49','50','60','109','124','125','192','208']   
 
     #haloprof(tfile_cm,halo_nums_cm)
     #haloprof(tfile_r,halo_nums_r)
@@ -247,8 +248,14 @@ if __name__ == '__main__':
     haloprof_cumplot(tfile_e,halo_nums_e)
     haloprof_cumplot(tfile_s,halo_nums_s)
     haloprof_cumplot(tfile_r,halo_nums_r)
-    axs[0].set_ylim([1e-4,3])
-    axs[1].set_ylim([1e-3,100])
+    axs[0].plot([-1,3],[1,1],color = 'k',linestyle = '--')
+    axs[0].plot([1,1],[1e-3,3],color = 'k',linestyle = '--')
+    axs[1].plot([-1,3],[1,1],color = 'k',linestyle = '--')
+    axs[1].plot([1,1],[1e-3,10],color = 'k',linestyle = '--')
+    axs[0].set_ylim([1e-3,3])
+    axs[1].set_ylim([1e-3,10])
+    axs[0].set_xlim([0,2])
+    axs[1].set_xlim([0,2])    
     plt.tight_layout(w_pad=1.4)
     f.subplots_adjust(right=0.8)
     b_ax = f.add_axes([0.85, f.subplotpars.bottom, 0.02, (f.subplotpars.top - f.subplotpars.bottom)])
