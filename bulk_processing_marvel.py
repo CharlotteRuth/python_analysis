@@ -37,85 +37,104 @@ def bulk_processing(tfile,halo_nums):
     maxHI = np.amax(s.gas['HI'])
         
     f=open(tfile+'.data','wb')
-
+    
     for halo_num in halo_nums:
         print(halo_num)
         halo_ahf = h[int(halo_num)] #h.load_copy(int(halo_num))
+
+        #halo_ahf = halo_ahf[pynbody.filt.Sphere(5*np.std(np.sqrt(halo_ahf['x'].in_units('kpc')**2 + halo_ahf['y'].in_units('kpc')**2 + halo_ahf['z'].in_units('kpc')**2)), (np.mean(halo_ahf['x'].in_units('kpc')),np.mean(halo_ahf['y'].in_units('kpc')),np.mean(halo_ahf['z'].in_units('kpc'))))] #Filter out outlying particles. I thought this was happening with Sonia but I was wrong. A massive dark matter particle was being included in the halos
+        pynbody.analysis.halo.center(halo_ahf,vel = False)
+        rvir = pynbody.array.SimArray(np.max(np.sqrt(halo_ahf['x'].in_units('kpc')**2 + halo_ahf['y'].in_units('kpc')**2 + halo_ahf['z'].in_units('kpc')**2)),'kpc')
+        halo = halo_ahf
+        #halo = s[pynbody.filt.Sphere(rvir, (0,0,0))] #This code can be used to select all material within a virial radius, whether AHF considers it part of the halo or not. It presents problems for satellites as then the host halo material is included.
         
-        pynbody.analysis.halo.center(halo_ahf,vel= False)           
-        rvir = pynbody.array.SimArray(np.sqrt(np.max(halo_ahf['x'].in_units('kpc')**2 + halo_ahf['y'].in_units('kpc')**2 + halo_ahf['z'].in_units('kpc')**2)),'kpc')
-        halo = s[pynbody.filt.Sphere(rvir, (0,0,0))]
-        
-        stars = halo_ahf.star
+        stars = halo.star
         stars.physical_units()
 
         #For calculating HI and halo mass
         currenttime = halo.properties['time'].in_units('Gyr')
-        ISM = halo.gas[pynbody.filt.LowPass('temp', '1e4 K')]
-        cool = halo.gas[pynbody.filt.BandPass('temp', '1e4 K', '1e5 K')]
-        warm = halo.gas[pynbody.filt.BandPass('temp', '1e5 K', '1e6 K')]
-        hot = halo.gas[pynbody.filt.HighPass('temp', '1e6 K')]
         if len(halo.g) != 0 :
+            ISM = halo.gas[pynbody.filt.LowPass('temp', '1e4 K')]
+            cool = halo.gas[pynbody.filt.BandPass('temp', '1e4 K', '1e5 K')]
+            warm = halo.gas[pynbody.filt.BandPass('temp', '1e5 K', '1e6 K')]
+            hot = halo.gas[pynbody.filt.HighPass('temp', '1e6 K')]
+            mISM = np.sum(ISM['mass'].in_units('Msol'))
+            mwarm =  np.sum(warm['mass'].in_units('Msol'))
+            mCool =  np.sum(cool['mass'].in_units('Msol'))
+            mHot =  np.sum(hot['mass'].in_units('Msol'))
+            mZISM =   np.sum(ISM['mass'].in_units('Msol')*ISM['metals'])
+            mZwarm = np.sum(warm['mass'].in_units('Msol')*warm['metals'])
+            mZCool = np.sum(cool['mass'].in_units('Msol')*cool['metals'])
+            mZHot = np.sum(hot['mass'].in_units('Msol')*hot['metals'])
             mHI = np.sum(halo.gas[filt.LowPass('temp',2e4)].gas['HI']*halo.gas[filt.LowPass('temp',2e4)].gas['mass'].in_units('Msol'))
-            mwarm_coolon = np.sum((warm[pynbody.filt.HighPass('coolontime', str(currenttime)+' Gyr')])['mass'].in_units('Msol')),
-            mCool_coolon = np.sum((cool[pynbody.filt.HighPass('coolontime', str(currenttime)+' Gyr')])['mass'].in_units('Msol')),
-            mHot_coolon =  np.sum((hot[pynbody.filt.HighPass('coolontime', str(currenttime)+' Gyr')])['mass'].in_units('Msol')),
+            mwarm_coolon = np.sum((warm[pynbody.filt.HighPass('coolontime', str(currenttime)+' Gyr')])['mass'].in_units('Msol'))
+            mCool_coolon = np.sum((cool[pynbody.filt.HighPass('coolontime', str(currenttime)+' Gyr')])['mass'].in_units('Msol'))
+            mHot_coolon =  np.sum((hot[pynbody.filt.HighPass('coolontime', str(currenttime)+' Gyr')])['mass'].in_units('Msol'))
+
+            #For calculating the gas-phase oxygen metallicity
+            H2form = 1 #These currently need to be copied over by hand from the paramfile. It would be better to have them read in
+            cstar = 0.1
+            tempcut = 1e3
+            denscut = 0.1 #amu/cc
+            deltat = 1e6*3.15569e7 #seconds
+            grav =  6.67408e-11 #m3 kg-1 s-2
+            halo.g['tdyn'] = 1.0/np.sqrt(4.0*np.pi*grav*halo.g['rho'].in_units('kg m^-3')) #in seconds
+            sfgas = halo.g[filt.HighPass('rho',str(denscut)+' m_p cm^-3')]
+            if len(sfgas) != 0 :
+                sfgas = sfgas[filt.LowPass('temp',str(tempcut)+' K')]
+                if len(sfgas) != 0 :
+                    if H2form:
+                        sfgas['sfeff'] = 1.0 - np.exp(-1.0*cstar*deltat/sfgas['tdyn']*2.0*sfgas['H2']/(2.0*sfgas['H2'] + sfgas['HI']))
+                    else :
+                        sfgas['sfeff'] = 1.0 - np.exp(-1.0*cstar*deltat/sfgas['tdyn'])
+                    oxh_sfr = np.log10(np.sum((10**sfgas['oxh'])*(XSOLO / XSOLH)/15.9*sfgas['sfeff']*sfgas['mass'])/np.sum(sfgas['sfeff']*sfgas['mass']))
+                else :
+                    oxh_sfr = 0
+            else :
+                oxh_sfr = 0
+
+            coldcut = 1e4
+            coldgas = halo.g[filt.LowPass('temp',str(coldcut)+' K')]
+            if len(coldgas) != 0:
+                oxh_cold = np.log10(np.sum((10**coldgas['oxh'])*(XSOLO / XSOLH)/15.9*coldgas['mass'])/np.sum(coldgas['mass']))
+            else :
+                oxh_cold = 0
         else :
+            mISM = 0
+            mwarm = 0
+            mcool = 0
+            mHot = 0
+            mZISM = 0
+            mZwarm = 0
+            mZCool = 0
+            mZHot = 0
             mHI = 0
-        
-        #For calculating the metallicity
-
-        minmetal = np.amin(s.stars['metals'][np.where(s.stars['metals'] > 0)])
-        s.stars['metals'][np.where(s.stars['metals'] == 0)] = minmetal
-
+            mwarm_coolon = 0
+            mCool_coolon = 0
+            mHot_coolon =  0
+            oxh_sfr = 0
+            oxh_cold = 0
+            
         #For stellar half-mass raidus
         profile_stellar = pynbody.analysis.profile.Profile(stars,ndin = 2,min = 0, max = np.ceil(rvir), nbins = int(np.ceil(rvir)/0.01))
         index = np.argmin(np.abs(profile_stellar['mass_enc']/max(profile_stellar['mass_enc']) - 0.5))
         r_half = profile_stellar['rbins'].in_units('kpc')[index]
 
-        #For calculating the gas-phase oxygen metallicity
-        H2form = 1 #These currently need to be copied over by hand from the paramfile. It would be better to have them read in
-        cstar = 0.1
-        tempcut = 1e3
-        denscut = 0.1 #amu/cc
-        deltat = 1e6*3.15569e7 #seconds
-        grav =  6.67408e-11 #m3 kg-1 s-2
-        halo.g['tdyn'] = 1.0/np.sqrt(4.0*np.pi*grav*halo.g['rho'].in_units('kg m^-3')) #in seconds
-        sfgas = halo.g[filt.HighPass('rho',str(denscut)+' m_p cm^-3')]
-        if len(sfgas) != 0 :
-            sfgas = sfgas[filt.LowPass('temp',str(tempcut)+' K')]
-            if len(sfgas) != 0 :
-                if H2form:
-                    sfgas['sfeff'] = 1.0 - np.exp(-1.0*cstar*deltat/sfgas['tdyn']*2.0*sfgas['H2']/(2.0*sfgas['H2'] + sfgas['HI']))
-                else :
-                    sfgas['sfeff'] = 1.0 - np.exp(-1.0*cstar*deltat/sfgas['tdyn'])
-                oxh_sfr = np.log10(np.sum((10**sfgas['oxh'])*(XSOLO / XSOLH)/15.9*sfgas['sfeff']*sfgas['mass'])/np.sum(sfgas['sfeff']*sfgas['mass']))
-            else :
-                oxh_sfr = 0
-        else :
-            oxh_sfr = 0
-
-        coldcut = 1e4
-        coldgas = halo.g[filt.LowPass('temp',str(coldcut)+' K')]
-        if len(coldgas) != 0:
-            oxh_cold = np.log10(np.sum((10**coldgas['oxh'])*(XSOLO / XSOLH)/15.9*coldgas['mass'])/np.sum(coldgas['mass']))
-        else :
-            oxh_cold = 0
-            
+        print(np.mean(np.log10(stars['metals']/ZSOLAR)))
         pickle.dump({'haloid': halo_num,
              'z': s.properties['z'],
              'time': currenttime,
              'mvir':  np.sum(halo['mass'].in_units('Msol')),
              'rvir':  rvir,
              'mgas':  np.sum(halo.gas['mass'].in_units('Msol')),
-             'mISM':  np.sum(ISM['mass'].in_units('Msol')),
-             'mwarm': np.sum(warm['mass'].in_units('Msol')),
-             'mCool': np.sum(cool['mass'].in_units('Msol')),
-             'mHot': np.sum(hot['mass'].in_units('Msol')),
-             'mZISM':  np.sum(ISM['mass'].in_units('Msol')*ISM['metals']),
-             'mZwarm': np.sum(warm['mass'].in_units('Msol')*warm['metals']),
-             'mZCool': np.sum(cool['mass'].in_units('Msol')*cool['metals']),
-             'mZHot': np.sum(hot['mass'].in_units('Msol')*hot['metals']),
+             'mISM':  mISM,
+             'mwarm': mwarm,
+             'mCool': mCool,
+             'mHot': mHot,
+             'mZISM':  mZISM,
+             'mZwarm': mZwarm,
+             'mZCool': mZCool,
+             'mZHot': mZHot,
              'mZstar': np.sum(stars['mass'].in_units('Msol')*stars['metals']),
              'mwarm_coolon': mwarm_coolon,
              'mCool_coolon': mCool_coolon,
@@ -154,31 +173,37 @@ def bulk_processing_read(tfile):
     objs_pd = pd.DataFrame(objs)
     
 if __name__ == '__main__':    
-    if (socket.gethostname() == "quirm"):
+    if (socket.gethostname() == "quirm.math.grinnell.edu"):
         prefix = '/home/christenc/Data/Sims/'
     else:
         prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
- 
+
+#Sandra 
     tfile_name = 'h148.cosmo50PLK.3072g3HbwK1BH.004096'
     tfile = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
     halo_nums = ['1','2','3','5','6','9','10','11','12','14','18','23','26','28','31','34','36','42','57','64','77','94','125','160','252','264','271','304']
     bulk_processing(tfile,halo_nums)
-    
-    tfile_name = 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
-    tfile = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
-    halo_nums = ['1','9','32','126','129']
-    bulk_processing(tfile,halo_nums)
-    
+
+#Ruth    
     tfile_name = 'h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     halo_nums = ['1','2','4','7','17','21','22','27','51','52','70','104','203']
     bulk_processing(tfile,halo_nums)
-    
+
+#Sonia    
     tfile_name = 'h242.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'      
     halo_nums = ['1','9','11','24','29','30','33','39','40','45','75','76']
+    #M200 AHF halo_nums = ['1','8','10','21','26','30','34','38','42','69','70','401','421']
+    #bulk_processing(tfile,halo_nums)
+
+#Elena
+    tfile_name = 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
+    tfile = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
+    halo_nums = ['1','9','32','126','129']
     bulk_processing(tfile,halo_nums)
-        
+
+    
     tfile = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     halo_nums = ['1','2','4','5','6','7','10','11','13','14','27']
