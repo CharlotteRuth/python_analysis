@@ -6,7 +6,7 @@ import socket
 import pandas as pd
 import sys, os, glob, pickle
 
-if (socket.gethostname() == "quirm"):
+if (socket.gethostname() == "quirm.math.grinnell.edu"):
     prefix = '/home/christenc/Data/Sims/'
     outprefix = '/home/christenc/Figures/marvel/'
     dataprefix = '/home/christenc/Code/Datafiles/'
@@ -15,7 +15,7 @@ else:
     outprefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
     dataprefix = '/home/christensen/Code/Datafiles/'
 
-presentation = True
+presentation = True #False
 if presentation:
     outbase = outprefix + 'marvel_pres_'
     plt.style.use(['default','/home/christenc/.config/matplotlib/presentation.mplstyle'])
@@ -23,6 +23,7 @@ if presentation:
     aspect_ratio = 3.0/4.0
     legendsize = 16
     dpi = 100
+    markersize = 40
 else:
     outbase = outprefix + 'marvel'
     plt.style.use(['default','/home/christenc/.config/matplotlib/article.mplstyle'])
@@ -30,6 +31,7 @@ else:
     aspect_ratio = 3.0/4.0
     legendsize = 5
     dpi = 300
+    markersize = 12
 
 min_nstar =  100 
 dInitStarMass   = 1.82699e-13*2.310e15
@@ -209,9 +211,82 @@ colors_ruth_f = np.linspace(0,len(objs_pd_ruth)-1,num = len(objs_pd_ruth)) % 20
 colors_sonia_f = np.linspace(0,len(objs_pd_sonia)-1,num = len(objs_pd_sonia)) % 20
 colors_elena_f = np.linspace(0,len(objs_pd_elena)-1,num = len(objs_pd_elena)) % 20
 
+#Begum+, 2008 Table 1
+f = open(dataprefix+'FiggsTable1.txt','r')
+begumdata_T1 = []
+for line in f:
+    line = line.strip()
+    columns = line.split()
+    if len(columns) == 15 and columns[0] != 'Galaxy':
+        source = {}
+        source['gal'] = columns[0]
+        source['RA_1'] = float(columns[1]) # hour
+        source['RA_2'] = float(columns[2]) # min
+        source['RA_3'] = float(columns[3]) # s
+        source['dec_1'] = float(columns[4]) # degree
+        source['dec_2'] = float(columns[5]) # arcmin
+        source['dec_3'] = float(columns[6]) # arcsec
+        source['M_B'] = float(columns[7]) # mag
+        source['D_H0'] = float(columns[8]) # arcmin
+        source['B_V'] = float(columns[9]) # mag == -1 if unknown
+        source['d'] = float(columns[10]) # Mpc
+        source['D_estm'] = columns[11]
+        source['group'] = columns[12]
+        source['i_opt'] = float(columns[13]) # degree
+        source['ref'] = columns[14]
+        begumdata_T1.append(source)
+f.close()
+begumdata_T1 = pd.DataFrame(begumdata_T1)
 
-#Recent SFR vs Average historical SFR
-#McQuinn+ 2015, Figures 4 and 5
+#Begum+, 2008 Table 3
+f = open(dataprefix+'FiggsTable3.txt','r')
+#Conversion between Mag_B and stellar mass from McGaugh+ 2008
+M_B_sun = 5.44 #Mann & von Braun, 2015 PASP 127,102
+MLa = -0.942
+MLb = 1.69
+begumdata = []
+for line in f:
+    line = line.strip()
+    columns = line.split()
+    if len(columns) == 17 and columns[0] != 'Galaxy':
+        source = {}
+        source['gal'] = columns[0]
+        source['FI_GMRT'] = float(columns[1]) #Jy km s^-1
+        source['FI_GMRT_err_sign'] = columns[2]
+        source['FI_GMRT_err'] = float(columns[3]) #Jy km s^-1
+        source['V_sys'] = float(columns[4]) #km s^-1
+        source['DeltaV_50'] = float(columns[5]) #km s^-1
+        source['D_HI'] = float(columns[6]) #arcmin
+        source['M_HI'] = float(columns[7]) #10^6 Msun
+        source['M_HI_L_B'] = float(columns[8])
+        source['D_HI_D_H0'] = float(columns[9])
+        source['FI_GMRT_FI_SD'] = float(columns[10])#-1 means data was not available
+        source['FI_GMRT_FI_SD_err_sign'] = columns[11]
+        source['FI_GMRT_FI_SD_err'] = float(columns[12])
+        source['i_HI'] = float(columns[13]) #-1 means data was not available
+        source['i_HI_err_sign'] = columns[14]
+        source['i_HI_err'] = float(columns[15])
+        source['ref'] = columns[16]
+        if any(begumdata_T1['gal'] == columns[0]):
+            source['M_B'] = float(begumdata_T1['M_B'][begumdata_T1['gal'] == columns[0]]) # mag
+            source['B_V'] = float(begumdata_T1['B_V'][begumdata_T1['gal'] == columns[0]]) # mag
+            if source['B_V'] != -1:
+                source['L_B'] = 10**((source['M_B'] - M_B_sun)/-2.5)
+                MLfit = 10**(MLa + MLb*source['B_V'])
+                source['smass'] = MLfit*source['L_B']
+            else:
+                source['L_B'] = -1
+                source['smass'] = -1                
+        else:
+            source['M_B'] = -1
+            source['B_V'] = -1
+            source['L_B'] = -1
+            source['smass'] = -1
+        begumdata.append(source)
+f.close()
+begumdata = pd.DataFrame(begumdata)
+        
+#McQuinn+ 2015, Figures 4 and 5 (Shield galaxies)
 f = open(dataprefix+'McQuinn2015.txt', 'r')
 mcquinndata = []
 for line in f:
@@ -245,18 +320,45 @@ for line in f:
 f.close()
 mcquinndata = pd.DataFrame(mcquinndata)
 
+#McGaugh 2005
+f = open(dataprefix+'HIcubes/BTF.dat', 'r')
+mcgaughdata = []
+for line in f:
+    line = line.strip()
+    columns = line.split()
+    if len(columns) == 10:
+        source = {}
+        source['gal'] = columns[0]
+        source['V_f'] = float(columns[1])
+        source['M_star'] = float(columns[2])
+        source['M_gas'] = float(columns[3])
+        source['mu_0'] = float(columns[4])
+        source['R_d'] = float(columns[5])
+        source['B_V'] = float(columns[6])
+        source['gamma_max'] = float(columns[7])
+        source['gamma_pop'] = float(columns[8])
+        source['gamma_acc'] = float(columns[9])
+        mcgaughdata.append(source)
+f.close()
+mcgaughdata = pd.DataFrame(mcgaughdata)
+        
+#Recent SFR vs Average historical SFR
 """
+#Plots the current vs lifetime star formation rate, which shows quenched galaxies
 plt.figure(1)
-#Fix upper limits in McQuinn data (marked as a zero in the minus error term) before publishing
-mcquinn_plt = plt.errorbar(1e-3*mcquinndata['SFRlifetime'],1e-3*mcquinndata['SFRrecent'],xerr=[1e-3*mcquinndata['SFRlifetime_merr'],1e-3*mcquinndata['SFRlifetime_perr']],yerr=[1e-3*mcquinndata['SFRrecent_merr'],1e-3*mcquinndata['SFRrecent_perr']],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar'])/np.array(objs_pd_cm['time'])/1e9,np.array(objs_pd_cm['SFR']),marker = markers[0], label = 'Cpt. Marvel',zorder = 2,c = colors_cm, cmap = colormap,norm = cNorm)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mstar'])/np.array(objs_pd_r['time'])/1e9,np.array(objs_pd_r['SFR']),marker = markers[1],zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mstar'])/np.array(objs_pd_e['time'])/1e9,np.array(objs_pd_e['SFR']),marker = markers[2],zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-storm_plt = plt.scatter(np.array(objs_pd_s['mstar'])/np.array(objs_pd_s['time'])/1e9,np.array(objs_pd_s['SFR']),marker = markers[3],zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar'])/np.array(objs_pd_sandra['time'])/1e9,np.array(objs_pd_sandra['SFR']),marker = markers[4],zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar'])/np.array(objs_pd_ruth['time'])/1e9,np.array(objs_pd_ruth['SFR']),marker = markers[5],zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar'])/np.array(objs_pd_sonia['time'])/1e9,np.array(objs_pd_sonia['SFR']),marker = markers[6],zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-elena_plt = plt.scatter(np.array(objs_pd_elena['mstar'])/np.array(objs_pd_elena['time'])/1e9,np.array(objs_pd_elena['SFR']),marker = markers[7],zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+mcquinn_plt = plt.errorbar(1e-3*mcquinndata['SFRlifetime'],1e-3*mcquinndata['SFRrecent'],xerr=[1e-3*mcquinndata['SFRlifetime_merr'],1e-3*mcquinndata['SFRlifetime_perr']],yerr=[1e-3*mcquinndata['SFRrecent_merr'],1e-3*mcquinndata['SFRrecent_perr']],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limits to recent star formation (y-axis)
+plt.errorbar(1e-3*mcquinndata['SFRlifetime'][mcquinndata['SFRrecent_merr'] == 0],1e-3*mcquinndata['SFRrecent'][mcquinndata['SFRrecent_merr'] == 0],xerr=[1e-3*mcquinndata['SFRlifetime_merr'][mcquinndata['SFRrecent_merr'] == 0],1e-3*mcquinndata['SFRlifetime_perr'][mcquinndata['SFRrecent_merr'] == 0]],yerr=[1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0],1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]],color = "grey",fmt="_",zorder = 1,ms = 3,uplims=True,capsize = 3)
+#Upper limits to lifetime star formation (x-axis)
+plt.errorbar(1e-3*mcquinndata['SFRlifetime'][mcquinndata['SFRlifetime_merr'] == 0],1e-3*mcquinndata['SFRrecent'][mcquinndata['SFRlifetime_merr'] == 0],xerr=[1e-3*mcquinndata['SFRlifetime_perr'][mcquinndata['SFRlifetime_merr'] == 0],1e-3*mcquinndata['SFRlifetime_perr'][mcquinndata['SFRlifetime_merr'] == 0]],yerr=[1e-3*mcquinndata['SFRrecent_merr'][mcquinndata['SFRlifetime_merr'] == 0],1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRlifetime_merr'] == 0]],color = "grey",fmt="_",zorder = 1,ms = 3,xuplims=True,capsize = 3)
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar'])/np.array(objs_pd_cm['time'])/1e9,np.array(objs_pd_cm['SFR']),marker = markers[0], s = markersize, label = 'Cpt. Marvel',zorder = 2,c = colors_cm, cmap = colormap,norm = cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar'])/np.array(objs_pd_r['time'])/1e9,np.array(objs_pd_r['SFR']),marker = markers[1], s = markersize,zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar'])/np.array(objs_pd_e['time'])/1e9,np.array(objs_pd_e['SFR']),marker = markers[2], s = markersize,zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar'])/np.array(objs_pd_s['time'])/1e9,np.array(objs_pd_s['SFR']),marker = markers[3], s = markersize,zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar'])/np.array(objs_pd_sandra['time'])/1e9,np.array(objs_pd_sandra['SFR']),marker = markers[4], s = markersize,zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar'])/np.array(objs_pd_ruth['time'])/1e9,np.array(objs_pd_ruth['SFR']),marker = markers[5], s = markersize,zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar'])/np.array(objs_pd_sonia['time'])/1e9,np.array(objs_pd_sonia['SFR']),marker = markers[6], s = markersize,zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar'])/np.array(objs_pd_elena['time'])/1e9,np.array(objs_pd_elena['SFR']),marker = markers[7], s = markersize,zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.plot([1e-5,100],[1e-5,100],color = 'k')
 plt.xlabel(r'Lifetime SFR [M$_\odot$ yr$^{-1}$]')
 plt.ylabel(r'Recent SFR [M$_\odot$ yr$^{-1}$]')
@@ -273,15 +375,19 @@ plt.close()
 #Star forming main sequence
 #McQuinn+ 2015, Figure 7 and 8
 plt.figure(1,figsize=(plt_width,plt_width))
-#mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,1e-3*mcquinndata['SFRrecent']/mcquinndata['mstar']/1e6,xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[1e-3*mcquinndata['SFRrecent_merr']/mcquinndata['mstar']/1e6,1e-3*mcquinndata['SFRrecent_perr']/mcquinndata['mstar']/1e6],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR'])/np.array(objs_pd_cm['mstar']),marker = markers[0], label = 'Cpt. Marvel' ,zorder = 2,edgecolors = 'k', cmap = colormap, norm=cNorm,facecolors = colors_cm_f)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR'])/np.array(objs_pd_r['mstar']),marker = markers[1],zorder = 3,edgecolors = 'k', cmap = colormap, norm=cNorm, facecolors = colors_r_f)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR'])/np.array(objs_pd_e['mstar']),marker = markers[2],zorder = 4,edgecolors = 'k', cmap = colormap, norm=cNorm, facecolors = colors_e_f)
-storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR'])/np.array(objs_pd_s['mstar']),marker = markers[3],zorder = 5,edgecolors = 'k', cmap = colormap, norm=cNorm, facecolors = colors_s_f)
-#sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']),marker = markers[4],zorder = 5,edgecolors = colors_sandra, cmap = colormap, norm=cNorm, facecolors = colors_sandra_f)
-#ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5],zorder = 5,edgecolors = colors_ruth, cmap = colormap, norm=cNorm, facecolors = colors_ruth_f)
-#sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6],zorder = 5,edgecolors = colors_sonia, cmap = colormap, norm=cNorm, facecolors = colors_sonia_f)
-#elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7],zorder = 5,edgecolors = colors_elena, cmap = colormap, norm=cNorm, facecolors = colors_elena_f)
+mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,1e-3*mcquinndata['SFRrecent']/mcquinndata['mstar']/1e6,xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[1e-3*mcquinndata['SFRrecent_merr']/mcquinndata['mstar']/1e6,1e-3*mcquinndata['SFRrecent_perr']/mcquinndata['mstar']/1e6],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limits to specific star formation (y-axis)
+plt.errorbar(mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0]*1e6,1e-3*mcquinndata['SFRrecent'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0]/1e6,xerr=[mcquinndata['mstar_merr'][mcquinndata['SFRrecent_merr'] == 0]*1e6,mcquinndata['mstar_perr'][mcquinndata['SFRrecent_merr'] == 0]*1e6],yerr=[1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0]/1e6,1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0]/1e6],color = "grey",fmt="_",zorder = 1,ms = 3,uplims=True,capsize = 3)
+#Upper limits to stellar mass (x-axis)
+plt.errorbar(mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]*1e6,1e-3*mcquinndata['SFRrecent'][mcquinndata['mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]/1e6,xerr=[mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6,mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6],yerr=[1e-3*mcquinndata['SFRrecent_merr'][mcquinndata['mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]/1e6,1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]/1e6],color = "grey",fmt="_",zorder = 1,xuplims=True,ms = 3,capsize = 3)
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR'])/np.array(objs_pd_cm['mstar']),marker = markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2, c = colors_cm, cmap = colormap, norm=cNorm) #,edgecolors = 'k',facecolors = colors_cm_f)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR'])/np.array(objs_pd_r['mstar']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3, c = colors_r, cmap = colormap, norm=cNorm) #,edgecolors = 'k', facecolors = colors_r_f)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR'])/np.array(objs_pd_e['mstar']),marker = markers[2], s = markersize, label = 'Elektra', zorder = 4, c = colors_e, cmap = colormap, norm=cNorm) # edgecolors = 'k', facecolors = colors_e_f)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR'])/np.array(objs_pd_s['mstar']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5, c = colors_s, cmap = colormap, norm=cNorm) #, edgecolors = 'k', facecolors = colors_s_f)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']), marker = markers[4], s = markersize, label = 'Sandra', zorder = 5, c = colors_sandra, cmap = colormap, norm=cNorm) #edgecolors = colors_sandra, facecolors = colors_sandra_f)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5, c = colors_ruth, cmap = colormap, norm=cNorm) #edgecolors = colors_ruth, facecolors = colors_ruth_f)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5, c = colors_sonia, cmap = colormap, norm=cNorm) # edgecolors = colors_sonia, facecolors = colors_sonia_f)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5, c = colors_elena, cmap = colormap, norm=cNorm) #, edgecolors = colors_elena,facecolors = colors_elena_f)
 plt.xlabel(r'M$_*$/M$_\odot$')
 plt.ylabel(r'SSFR [yr$^{-1}$]')
 plt.xscale('log')
@@ -300,24 +406,29 @@ plt.close()
 
 #Star forming main sequence
 #McQuinn+ 2015, Figure 7 and 8
-plt.figure(1)
-mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,1e-3*mcquinndata['SFRrecent'],xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[1e-3*mcquinndata['SFRrecent_merr'],1e-3*mcquinndata['SFRrecent_perr']],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR']),marker = markers[0], label = 'Cpt. Marvel' ,zorder = 2,edgecolors = colors_cm, cmap = colormap, norm=cNorm,facecolors = colors_cm_f)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR']),marker = markers[1],zorder = 3,edgecolors = colors_r, cmap = colormap, norm=cNorm, facecolors = colors_r_f)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR']),marker = markers[2],zorder = 4,edgecolors = colors_e, cmap = colormap, norm=cNorm, facecolors = colors_e_f)
-storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR']),marker = markers[3],zorder = 5,edgecolors = colors_s, cmap = colormap, norm=cNorm, facecolors = colors_s_f)
-#sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']),marker = markers[4],zorder = 5,edgecolors = colors_sandra, cmap = colormap, norm=cNorm, facecolors = colors_sandra_f)
-#ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5],zorder = 5,edgecolors = colors_ruth, cmap = colormap, norm=cNorm, facecolors = colors_ruth_f)
-#sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6],zorder = 5,edgecolors = colors_sonia, cmap = colormap, norm=cNorm, facecolors = colors_sonia_f)
-#elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7],zorder = 5,edgecolors = colors_elena, cmap = colormap, norm=cNorm, facecolors = colors_elena_f)
+plt.figure(1,figsize=(plt_width,plt_width))
+mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,1e-3*mcquinndata['SFRrecent'],xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[1e-3*mcquinndata['SFRrecent_merr'],1e-3*mcquinndata['SFRrecent_perr']],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limits to specific star formation (y-axis)
+plt.errorbar(mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0]*1e6,1e-3*mcquinndata['SFRrecent'][mcquinndata['SFRrecent_merr'] == 0],xerr=[mcquinndata['mstar_merr'][mcquinndata['SFRrecent_merr'] == 0]*1e6,mcquinndata['mstar_perr'][mcquinndata['SFRrecent_merr'] == 0]*1e6],yerr=[1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0],1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]],color = "grey",fmt="_",zorder = 1,ms = 3,uplims=True,capsize = 3)
+#Upper limits to stellar mass (x-axis)
+plt.errorbar(mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]*1e6,1e-3*mcquinndata['SFRrecent'][mcquinndata['mstar_merr'] == 0],xerr=[mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6,mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6],yerr=[1e-3*mcquinndata['SFRrecent_merr'][mcquinndata['mstar_merr'] == 0],1e-3*mcquinndata['SFRrecent_perr'][mcquinndata['mstar_merr'] == 0]],color = "grey",fmt="_",zorder = 1,xuplims=True,ms = 3,capsize = 3)
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR']),marker = markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2, c = colors_cm, cmap = colormap, norm=cNorm) #,edgecolors = 'k',facecolors = colors_cm_f)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3, c = colors_r, cmap = colormap, norm=cNorm) #,edgecolors = 'k', facecolors = colors_r_f)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR']),marker = markers[2], s = markersize, label = 'Elektra', zorder = 4, c = colors_e, cmap = colormap, norm=cNorm) # edgecolors = 'k', facecolors = colors_e_f)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5, c = colors_s, cmap = colormap, norm=cNorm) #, edgecolors = 'k', facecolors = colors_s_f)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR']), marker = markers[4], s = markersize, label = 'Sandra', zorder = 5, c = colors_sandra, cmap = colormap, norm=cNorm) #edgecolors = colors_sandra, facecolors = colors_sandra_f)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5, c = colors_ruth, cmap = colormap, norm=cNorm) #edgecolors = colors_ruth, facecolors = colors_ruth_f)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5, c = colors_sonia, cmap = colormap, norm=cNorm) # edgecolors = colors_sonia, facecolors = colors_sonia_f)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5, c = colors_elena, cmap = colormap, norm=cNorm) #, edgecolors = colors_elena,facecolors = colors_elena_f)
 plt.xlabel(r'M$_*$/M$_\odot$')
 plt.ylabel(r'SFR [M$_\odot$ yr$^{-1}$]')
 plt.xscale('log')
 plt.yscale('log')
+plt.axis([1e6, 4e11, 1e-4, 30])
 #plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm'],loc=3)
 #plt.legend([mcquinn_plt, cptmarvel_plt],['McQuinn+ 2015','Simulations'],loc=4)
-#plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=3)
-plt.legend([mcquinn_plt,cptmarvel_plt],['McQuinn et al. 2015','Simulations'],loc = 2,fontsize = legendsize)
+plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=2)
+#plt.legend([mcquinn_plt,cptmarvel_plt],['McQuinn et al. 2015','Simulations'],loc = 2,fontsize = legendsize)
 plt.tight_layout()
 plt.show()
 plt.savefig(outbase + '.sfms.png')
@@ -325,42 +436,83 @@ plt.close()
 
 #HI fraction vs stellar mass
 #McQuinn+ 2015, Figures 9 and 10 for SHIELD galaxies
-plt.figure(1)
-mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,mcquinndata['mHI_by_mstar'],xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),marker = markers[0], label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),marker = markers[1], label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),marker = markers[2], label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),marker = markers[3], label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),marker = markers[7], label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+#Before publishing, double check the lower/upper limit error bars as I think McQuinn did them wrong
+plt.figure(1,figsize=(plt_width,plt_width))
+mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,mcquinndata['mHI_by_mstar'],xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limits on stellar mass and lower limits on gas ratio
+plt.errorbar(mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]*1e6,mcquinndata['mHI_by_mstar'][mcquinndata['mstar_merr'] == 0],xerr=[mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6,mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6],yerr=[mcquinndata['mHI_by_mstar_perr'][mcquinndata['mstar_merr'] == 0],mcquinndata['mHI_by_mstar_perr'][mcquinndata['mstar_merr'] == 0]],color = "grey",fmt="o",zorder = 1,ms = 3,xuplims=True,uplims=True,capsize = 3)
+begum_plt = plt.scatter(begumdata['smass'],begumdata['M_HI']*1e6/begumdata['smass'],s = markersize,c = "grey", marker = "D")
+mcgaugh_plt = plt.scatter(mcgaughdata['M_star']*1e10,mcgaughdata['M_gas']/mcgaughdata['M_star'],s = markersize,c = "grey", marker = "s")
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']), marker = markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.xlabel(r'M$_*$/M$_\odot$')
 plt.ylabel(r'M$_{HI}$/M$_*$')
 plt.xscale('log')
-#plt.axis([1e6, 3e9, 0, 8.5])
-plt.axis([1e6, 1e12, 0, 8.5])
-#plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm'],loc=1)
-plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=1)
+#plt.axis([1e4, 1e12, 0, 60])
+plt.axis([1e6, 1e12, 0, 8.5]) #This cuts out two galaxis from elektra (one with gas ratio = 42, one with 52) and two from storm (gas ratio = 20 and 13). Both have stellar masses below 1e6
+#plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['McQuinn+ 2015','Begum+ 2008','Cpt. Marvel','Rogue','Elektra','Storm'],loc=1)
+plt.legend([mcquinn_plt, begum_plt, mcgaugh_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Begum+ 2008','McGaugh+ 2005','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=1)
 plt.show()
 plt.savefig(outbase + '.gasfrac_mstar.png')
 plt.clf()
 
+#HI fraction vs stellar mass
+#McQuinn+ 2015, Figures 9 and 10 for SHIELD galaxies
+#Before publishing, double check the lower/upper limit error bars as I think McQuinn did them wrong
+plt.figure(1,figsize=(plt_width,plt_width))
+mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,mcquinndata['mHI']/(mcquinndata['mHI'] + mcquinndata['mstar']),xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr = 0*mcquinndata['mHI'],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)#,yerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']]
+begum_plt = plt.scatter(begumdata['smass'],begumdata['M_HI']*1e6/(begumdata['smass'] + begumdata['M_HI']*1e6),s = markersize,c = "grey", marker="D")
+mcgaugh_plt = plt.scatter(mcgaughdata['M_star']*1e10,mcgaughdata['M_gas']/(mcgaughdata['M_gas'] +mcgaughdata['M_star']),s = markersize,c = "grey", marker = "s")
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['mHI'])/(np.array(objs_pd_cm['mHI']) + np.array(objs_pd_cm['mstar'])), marker = markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['mHI'])/(np.array(objs_pd_r['mHI']) + np.array(objs_pd_r['mstar'])),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['mHI'])/(np.array(objs_pd_e['mHI']) + np.array(objs_pd_e['mstar'])),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['mHI'])/(np.array(objs_pd_s['mHI']) + np.array(objs_pd_s['mstar'])),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['mHI'])/(np.array(objs_pd_sandra['mHI']) + np.array(objs_pd_sandra['mstar'])),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['mHI'])/(np.array(objs_pd_ruth['mHI']) + np.array(objs_pd_ruth['mstar'])),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['mHI'])/(np.array(objs_pd_sonia['mHI']) + np.array(objs_pd_sonia['mstar'])),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['mHI'])/(np.array(objs_pd_elena['mHI']) + np.array(objs_pd_elena['mstar'])),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+plt.xlabel(r'M$_*$/M$_\odot$')
+plt.ylabel(r'M$_{HI}$/(M$_*$ + M$_{HI})')
+plt.xscale('log')
+#plt.axis([1e4, 1e12, 0, 1])
+plt.axis([1e6, 1e12, 0, 1]) 
+#plt.legend([mcquinn_plt, begum_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['McQuinn+ 2015','Begum+ 2008','Cpt. Marvel','Rogue','Elektra','Storm'],loc=1)
+plt.legend([mcquinn_plt, begum_plt, mcgaugh_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Begum+ 2008','McGaugh+ 2005','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=1)
+plt.show()
+plt.savefig(outbase + '.gasfrac2_mstar.png')
+plt.clf()
+
+plt.figure(1,figsize=(plt_width,plt_width))
+begum_plot = plt.scatter(begumdata['M_B'][begumdata['smass']!=-1],begumdata['M_HI'][begumdata['smass']!=-1]*1e6/(begumdata['M_HI'][begumdata['smass']!=-1]*1e6 + begumdata['smass'][begumdata['smass']!=-1]),s = markersize,c = "grey", marker="o")
+plt.axis([-8,-24,0,1])
+begum_plot = plt.scatter(log10(begumdata['D_HI_D_H0']),log10(begumdata['M_HI_L_B']),s = markersize,c = "grey", marker="o")
+plt.axis([0, 1.3, -1, 1.6])
+begum_plot = plt.scatter(begumdata['M_B'][begumdata['M_B']!=-1],log10(begumdata['M_HI_L_B'][begumdata['M_B']!=-1]),s = markersize,c = "grey", marker="o")
+plt.axis([-9, -22, -1.6, 2.5])
+
 plt.figure(1)
-mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,mcquinndata['mHI_by_mstar'],xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),marker = markers[0], label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),marker = markers[1], label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),marker = markers[2], label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),marker = markers[3], label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], label = 'Storm', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),marker = markers[7], label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+mcquinn_plt = plt.errorbar(mcquinndata['mstar']*1e6,mcquinndata['mHI_by_mstar'],xerr=[mcquinndata['mstar_merr']*1e6,mcquinndata['mstar_perr']*1e6],yerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limits on stellar mass and lower limits on gas ratio
+plt.errorbar(mcquinndata['mstar'][mcquinndata['mstar_merr'] == 0]*1e6,mcquinndata['mHI_by_mstar'][mcquinndata['mstar_merr'] == 0],xerr=[mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6,mcquinndata['mstar_perr'][mcquinndata['mstar_merr'] == 0]*1e6],yerr=[mcquinndata['mHI_by_mstar_perr'][mcquinndata['mstar_merr'] == 0],mcquinndata['mHI_by_mstar_perr'][mcquinndata['mstar_merr'] == 0]],color = "grey",fmt="o",zorder = 1,ms = 3,xuplims=True,uplims=True,capsize = 3)
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),marker = markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], s = markersize, label = 'Storm', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.xlabel(r'M$_*$/M$_\odot$')
 plt.ylabel(r'M$_{HI}$/M$_*$')
 plt.xscale('log')
 #plt.axis([1e3, 3e9, 0, 200])
-plt.axis([1e3, 1e12, 0, 200])
+plt.axis([1e3, 1e12, 0, 60])
 #plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm'],loc=1)
 plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=1)
 plt.show()
@@ -368,17 +520,23 @@ plt.savefig(outbase + '.gasfrac_mstar_all.png')
 plt.clf()
 
 #Specific SFR vs gas ratio
+#Before publishing, double check the lower/upper limit error bars as I think McQuinn did them wrong
 #McQuinn+ 2015, Figure 11 and 12
 plt.figure(1)
-mcquinn_plt = plt.errorbar(mcquinndata['mHI_by_mstar'],1e-9*mcquinndata['SFRrecent']/mcquinndata['mstar'],xerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],yerr=[1e-9*mcquinndata['SFRrecent_merr']/mcquinndata['mstar'],1e-9*mcquinndata['SFRrecent_perr']/mcquinndata['mstar_perr']],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR'])/np.array(objs_pd_cm['mstar']),marker =  markers[0], label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR'])/np.array(objs_pd_r['mstar']),marker = markers[1], label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR'])/np.array(objs_pd_e['mstar']),marker = markers[2], label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-storm_plt = plt.scatter(np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR'])/np.array(objs_pd_s['mstar']),marker = markers[3], label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-sandra_plt = plt.scatter(np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-ruth_plt = plt.scatter(np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-sonia_plt = plt.scatter(np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-elena_plt = plt.scatter(np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7], label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+mcquinn_plt = plt.errorbar(mcquinndata['mHI_by_mstar'],1e-9*mcquinndata['SFRrecent']/mcquinndata['mstar'],xerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],yerr=[1e-9*mcquinndata['SFRrecent_merr']/mcquinndata['mstar'],1e-9*mcquinndata['SFRrecent_perr']/mcquinndata['mstar_perr']],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limit on SSFR
+plt.errorbar(mcquinndata['mHI_by_mstar'][mcquinndata['SFRrecent_merr'] == 0],1e-9*mcquinndata['SFRrecent'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0],xerr=[mcquinndata['mHI_by_mstar_merr'][mcquinndata['SFRrecent_merr'] == 0],mcquinndata['mHI_by_mstar_perr'][mcquinndata['SFRrecent_merr'] == 0]],yerr=[1e-9*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0],1e-9*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar_perr'][mcquinndata['SFRrecent_merr'] == 0]],color = "grey",fmt="o",zorder = 1,ms = 3,uplims=True,capsize = 3)
+#Upper(?) limits on gas fraction
+plt.errorbar(mcquinndata['mHI_by_mstar'][mcquinndata['mHI_by_mstar_merr'] == 0],1e-9*mcquinndata['SFRrecent'][mcquinndata['mHI_by_mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mHI_by_mstar_merr'] == 0],xerr=[mcquinndata['mHI_by_mstar_perr'][mcquinndata['mHI_by_mstar_merr'] == 0],mcquinndata['mHI_by_mstar_perr'][mcquinndata['mHI_by_mstar_merr'] == 0]],yerr=[1e-9*mcquinndata['SFRrecent_merr'][mcquinndata['mHI_by_mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mHI_by_mstar_merr'] == 0],1e-9*mcquinndata['SFRrecent_perr'][mcquinndata['mHI_by_mstar_merr'] == 0]/mcquinndata['mstar_perr'][mcquinndata['mHI_by_mstar_merr'] == 0]],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3,xuplims=True)
+
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR'])/np.array(objs_pd_cm['mstar']),marker =  markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR'])/np.array(objs_pd_r['mstar']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR'])/np.array(objs_pd_e['mstar']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR'])/np.array(objs_pd_s['mstar']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.xlabel(r'M$_{HI}$/M$_*$')
 plt.ylabel(r'SSFR [yr$^{-1}$]')
 plt.yscale('log')
@@ -390,19 +548,24 @@ plt.savefig(outbase + '.ssfr_gasfrac.png')
 plt.clf()
 
 plt.figure(1)
-mcquinn_plt = plt.errorbar(mcquinndata['mHI_by_mstar'],1e-9*mcquinndata['SFRrecent']/mcquinndata['mstar'],xerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],yerr=[1e-9*mcquinndata['SFRrecent_merr']/mcquinndata['mstar_merr'],1e-9*mcquinndata['SFRrecent_perr']/mcquinndata['mstar_perr']],color = "grey",fmt="o",zorder = 1)
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR'])/np.array(objs_pd_cm['mstar']),marker = markers[0], label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR'])/np.array(objs_pd_r['mstar']),marker = markers[1], label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR'])/np.array(objs_pd_e['mstar']),marker = markers[2], label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-storm_plt = plt.scatter(np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR'])/np.array(objs_pd_s['mstar']),marker = markers[3], label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-sandra_plt = plt.scatter(np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-ruth_plt = plt.scatter(np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-sonia_plt = plt.scatter(np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-elena_plt = plt.scatter(np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7], label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+mcquinn_plt = plt.errorbar(mcquinndata['mHI_by_mstar'],1e-9*mcquinndata['SFRrecent']/mcquinndata['mstar'],xerr=[mcquinndata['mHI_by_mstar_merr'],mcquinndata['mHI_by_mstar_perr']],yerr=[1e-9*mcquinndata['SFRrecent_merr']/mcquinndata['mstar'],1e-9*mcquinndata['SFRrecent_perr']/mcquinndata['mstar_perr']],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+#Upper limit on SSFR
+plt.errorbar(mcquinndata['mHI_by_mstar'][mcquinndata['SFRrecent_merr'] == 0],1e-9*mcquinndata['SFRrecent'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0],xerr=[mcquinndata['mHI_by_mstar_merr'][mcquinndata['SFRrecent_merr'] == 0],mcquinndata['mHI_by_mstar_perr'][mcquinndata['SFRrecent_merr'] == 0]],yerr=[1e-9*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar'][mcquinndata['SFRrecent_merr'] == 0],1e-9*mcquinndata['SFRrecent_perr'][mcquinndata['SFRrecent_merr'] == 0]/mcquinndata['mstar_perr'][mcquinndata['SFRrecent_merr'] == 0]],color = "grey",fmt="o",zorder = 1,ms = 3,uplims=True,capsize = 3)
+#Upper(?) limits on gas fraction
+plt.errorbar(mcquinndata['mHI_by_mstar'][mcquinndata['mHI_by_mstar_merr'] == 0],1e-9*mcquinndata['SFRrecent'][mcquinndata['mHI_by_mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mHI_by_mstar_merr'] == 0],xerr=[mcquinndata['mHI_by_mstar_perr'][mcquinndata['mHI_by_mstar_merr'] == 0],mcquinndata['mHI_by_mstar_perr'][mcquinndata['mHI_by_mstar_merr'] == 0]],yerr=[1e-9*mcquinndata['SFRrecent_merr'][mcquinndata['mHI_by_mstar_merr'] == 0]/mcquinndata['mstar'][mcquinndata['mHI_by_mstar_merr'] == 0],1e-9*mcquinndata['SFRrecent_perr'][mcquinndata['mHI_by_mstar_merr'] == 0]/mcquinndata['mstar_perr'][mcquinndata['mHI_by_mstar_merr'] == 0]],color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3,xuplims=True)
+
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mHI'])/np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['SFR'])/np.array(objs_pd_cm['mstar']),marker =  markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mHI'])/np.array(objs_pd_r['mstar']),np.array(objs_pd_r['SFR'])/np.array(objs_pd_r['mstar']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mHI'])/np.array(objs_pd_e['mstar']),np.array(objs_pd_e['SFR'])/np.array(objs_pd_e['mstar']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mHI'])/np.array(objs_pd_s['mstar']),np.array(objs_pd_s['SFR'])/np.array(objs_pd_s['mstar']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mHI'])/np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['SFR'])/np.array(objs_pd_sandra['mstar']),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mHI'])/np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['SFR'])/np.array(objs_pd_ruth['mstar']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mHI'])/np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['SFR'])/np.array(objs_pd_sonia['mstar']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mHI'])/np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['SFR'])/np.array(objs_pd_elena['mstar']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.xlabel(r'M$_{HI}$/M$_*$')
 plt.ylabel(r'SSFR [yr$^{-1}$]')
 plt.yscale('log')
-plt.axis([0, 150, 3e-12, 3e-9])
+plt.axis([0, 50, 3e-12, 3e-9])
 #plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm'],loc=4)
 plt.legend([mcquinn_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['McQuinn+ 2015','Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=4)
 plt.show()
@@ -413,14 +576,14 @@ plt.clf()
 #Half stellar mass radius vs stellar mass
 #
 plt.figure(1,figsize=(plt_width,plt_width))
-cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['r_half']),marker = markers[0], label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
-rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['r_half']),marker = markers[1], label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['r_half']),marker = markers[2], label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['r_half']),marker = markers[3], label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['r_half']),marker = markers[4], label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['r_half']),marker = markers[5], label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['r_half']),marker = markers[6], label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['r_half']),marker = markers[7], label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+cptmarvel_plt = plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['r_half']),marker = markers[0], s = markersize, label = 'Cpt. Marvel' ,zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+rogue_plt = plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['r_half']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+elektra_plt = plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['r_half']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+storm_plt = plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['r_half']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+sandra_plt = plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['r_half']),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+ruth_plt = plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['r_half']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+sonia_plt = plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['r_half']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+elena_plt = plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['r_half']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.xlabel(r'M$_*$/M$_\odot$')
 plt.ylabel(r'r$_{[1/2]}$ [kpc]')
 plt.xscale('log')
@@ -437,14 +600,14 @@ plt.clf()
 #1-D stellar velocity dispersion vs stellar mass
 #
 plt.figure(1,figsize=(plt_width,plt_width))
-plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['sigma_v']),marker = markers[0], label = 'Cpt. Marvel',zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['sigma_v']),marker = markers[1], label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['sigma_v']),marker = markers[2], label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['sigma_v']),marker = markers[3], label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['sigma_v']),marker = markers[4], label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['sigma_v']),marker = markers[5], label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['sigma_v']),marker = markers[6], label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
-plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['sigma_v']),marker = markers[7], label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_cm['mstar']),np.array(objs_pd_cm['sigma_v']),marker = markers[0], s = markersize, label = 'Cpt. Marvel',zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_r['mstar']),np.array(objs_pd_r['sigma_v']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_e['mstar']),np.array(objs_pd_e['sigma_v']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_s['mstar']),np.array(objs_pd_s['sigma_v']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_sandra['mstar']),np.array(objs_pd_sandra['sigma_v']),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_ruth['mstar']),np.array(objs_pd_ruth['sigma_v']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_sonia['mstar']),np.array(objs_pd_sonia['sigma_v']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm)
+plt.scatter(np.array(objs_pd_elena['mstar']),np.array(objs_pd_elena['sigma_v']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm)
 plt.xlabel(r'M$_*$/M$_\odot$')
 plt.ylabel(r'$\sigma_*$ [km/s]')
 plt.xscale('log')
@@ -496,17 +659,18 @@ objs_pd_elena['LogL_V'] = ((magVsolar - objs_pd_elena['M_V'])/2.5)
                                
 plt.figure(1)
 #kirbydata.plot(x = 'LogL_V',y = 'LogFe',yerr = 'LogFe_err',xerr = 'LogL_V_err',fmt="o",color = "grey")
-kirby_plt = plt.errorbar((kirbydata['LogL_V']).tolist(),kirbydata['LogFe'].tolist(),yerr = kirbydata['LogFe_err'].tolist(),xerr = kirbydata['LogL_V_err'].tolist(),color = "grey",fmt="o",zorder = 1)
-plt.scatter(np.array(objs_pd_cm['LogL_V'].values),np.array(objs_pd_cm['FeH_mean']),marker = markers[0], label = 'Cpt. Marvel',zorder = 2,edgecolors = colors_cm, cmap = colormap, norm=cNorm,facecolors = colors_cm_f)
-plt.scatter(np.array(objs_pd_r['LogL_V']),np.array(objs_pd_r['FeH_mean']),marker = markers[1], label = 'Rogue', zorder = 3,edgecolors = colors_r, cmap = colormap, norm=cNorm,facecolors = colors_r_f)
-plt.scatter(np.array(objs_pd_e['LogL_V']),np.array(objs_pd_e['FeH_mean']),marker = markers[2], label = 'Elektra',zorder = 4,edgecolors = colors_e, cmap = colormap, norm=cNorm,facecolors = colors_e_f)
-plt.scatter(np.array(objs_pd_s['LogL_V']),np.array(objs_pd_s['FeH_mean']),marker = markers[3], label = 'Storm', zorder = 5,edgecolors = colors_s, cmap = colormap, norm=cNorm,facecolors = colors_s_f)
-plt.scatter(np.array(objs_pd_sandra['LogL_V']),np.array(objs_pd_sandra['FeH_mean']),marker = markers[4], label = 'Sandra', zorder = 5,edgecolors = colors_sandra, cmap = colormap, norm=cNorm,facecolors = colors_sandra_f)
-plt.scatter(np.array(objs_pd_ruth['LogL_V']),np.array(objs_pd_ruth['FeH_mean']),marker = markers[5], label = 'Ruth', zorder = 5,edgecolors = colors_ruth, cmap = colormap, norm=cNorm,facecolors = colors_ruth_f)
-plt.scatter(np.array(objs_pd_sonia['LogL_V']),np.array(objs_pd_sonia['FeH_mean']),marker = markers[6], label = 'Sonia', zorder = 5,edgecolors = colors_sonia, cmap = colormap, norm=cNorm,facecolors = colors_sonia_f)
-plt.scatter(np.array(objs_pd_elena['LogL_V']),np.array(objs_pd_elena['FeH_mean']),marker = markers[7], label = 'Elena', zorder = 5,edgecolors = colors_elena, cmap = colormap, norm=cNorm,facecolors = colors_elena_f)
+kirby_plt = plt.errorbar((kirbydata['LogL_V']).tolist(),kirbydata['LogFe'].tolist(),yerr = kirbydata['LogFe_err'].tolist(),xerr = kirbydata['LogL_V_err'].tolist(),color = "grey",fmt="o",zorder = 1,ms = 3,capsize = 3)
+plt.scatter(np.array(objs_pd_cm['LogL_V'].values),np.array(objs_pd_cm['FeH_mean']),marker = markers[0], s = markersize, label = 'Cpt. Marvel',zorder = 2,c = colors_cm, cmap = colormap, norm=cNorm) #,edgecolors = colors_cm,facecolors = colors_cm_f)
+plt.scatter(np.array(objs_pd_r['LogL_V']),np.array(objs_pd_r['FeH_mean']),marker = markers[1], s = markersize, label = 'Rogue', zorder = 3,c = colors_r, cmap = colormap, norm=cNorm) #,edgecolors = colors_r,facecolors = colors_r_f)
+plt.scatter(np.array(objs_pd_e['LogL_V']),np.array(objs_pd_e['FeH_mean']),marker = markers[2], s = markersize, label = 'Elektra',zorder = 4,c = colors_e, cmap = colormap, norm=cNorm) #edgecolors = colors_e,facecolors = colors_e_f)
+plt.scatter(np.array(objs_pd_s['LogL_V']),np.array(objs_pd_s['FeH_mean']),marker = markers[3], s = markersize, label = 'Storm', zorder = 5,c = colors_s, cmap = colormap, norm=cNorm) #,edgecolors = colors_sfacecolors = colors_s_f)
+plt.scatter(np.array(objs_pd_sandra['LogL_V']),np.array(objs_pd_sandra['FeH_mean']),marker = markers[4], s = markersize, label = 'Sandra', zorder = 5,c = colors_sandra, cmap = colormap, norm=cNorm) #edgecolors = colors_sandra,facecolors = colors_sandra_f)
+plt.scatter(np.array(objs_pd_ruth['LogL_V']),np.array(objs_pd_ruth['FeH_mean']),marker = markers[5], s = markersize, label = 'Ruth', zorder = 5,c = colors_ruth, cmap = colormap, norm=cNorm) #edgecolors = colors_ruth,facecolors = colors_ruth_f)
+plt.scatter(np.array(objs_pd_sonia['LogL_V']),np.array(objs_pd_sonia['FeH_mean']),marker = markers[6], s = markersize, label = 'Sonia', zorder = 5,c = colors_sonia, cmap = colormap, norm=cNorm) #edgecolors = colors_sonia,facecolors = colors_sonia_f)
+plt.scatter(np.array(objs_pd_elena['LogL_V']),np.array(objs_pd_elena['FeH_mean']),marker = markers[7], s = markersize, label = 'Elena', zorder = 5,c = colors_elena, cmap = colormap, norm=cNorm) #edgecolors = colors_elena,facecolors = colors_elena_f)
 plt.xlabel(r'L$_V$/L$_{V,solar}$')
 plt.ylabel(r'<[Fe/H]>')
+
 #plt.legend([kirby_plt, cptmarvel_plt, rogue_plt, elektra_plt, storm_plt],['Kirby+ 2013','Cpt. Marvel','Rogue','Elektra','Storm'],loc=2)
 plt.legend([ cptmarvel_plt, rogue_plt, elektra_plt, storm_plt, sandra_plt, ruth_plt, sonia_plt, elena_plt],['Cpt. Marvel','Rogue','Elektra','Storm','Sandra','Ruth','Sonia','Elena'],loc=2)
 #plt.axis([3.5, 9.5, -3.5, -0.5])
