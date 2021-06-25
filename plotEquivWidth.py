@@ -18,7 +18,11 @@ def pickle_read(file):
     f=open(file, 'rb')
     while 1:
         try:
-            objs.append(pickle.load(f))
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            objs.append(p)
+            #objs.append(pickle.load(f))
         except EOFError:
             break
         
@@ -27,7 +31,7 @@ def pickle_read(file):
     return pd.DataFrame(objs)
 
 if __name__ == '__main__':    
-    if (socket.gethostname() == "quirm"):
+    if (socket.gethostname() == "quirm.math.grinnell.edu"):
         prefix = '/home/christenc/Data/Sims/'
         outprefix = '/home/christenc/Figures/marvel/'
         dataprefix = '/home/christenc/Code/Datafiles/'        
@@ -60,7 +64,10 @@ if __name__ == '__main__':
     f=open(tfile + '.data', 'rb')
     while 1:
         try:
-            objs_cm.append(pickle.load(f))
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            objs_cm.append(p)
         except EOFError:
             break
         
@@ -73,7 +80,10 @@ if __name__ == '__main__':
     f=open(tfile + '.data', 'rb')
     while 1:
         try:
-            objs_e.append(pickle.load(f))
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            objs_e.append(p)
         except EOFError:
             break
     f.close()
@@ -85,7 +95,10 @@ if __name__ == '__main__':
     f=open(tfile + '.data', 'rb')
     while 1:
         try:
-            objs_r.append(pickle.load(f))
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            objs_r.append(p)
         except EOFError:
             break
         
@@ -98,20 +111,23 @@ if __name__ == '__main__':
     f=open(tfile + '.data', 'rb')
     while 1:
         try:
-            objs_s.append(pickle.load(f))
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            objs_s.append(p)
         except EOFError:
             break
         
     f.close()
     objs_pd_s = pd.DataFrame(objs_s)
 
-    cm_1_label = '{:.1e}'.format(objs_pd_cm['mstar'][0]) + r' M$_\odot$, CM 1' #'Cpt. Marvel, 1'
-    e_1_label = '{:.1e}'.format(objs_pd_e['mstar'][0]) + r' M$_\odot$, E1' #'Elektra, 1'
-    e_2_label = '{:.1e}'.format(objs_pd_e['mstar'][1]) + r' M$_\odot$, E2' #'Elektra, 2'
-    r_1_label = '{:.1e}'.format(objs_pd_s['mstar'][0]) + r' M$_\odot$, R1' #'Rogue, 1'
-    r_3_label = '{:.1e}'.format(objs_pd_s['mstar'][1]) + r' M$_\odot$, R3' #'Rogue, 3'
-    s_1_label = '{:.1e}'.format(objs_pd_r['mstar'][0]) + r' M$_\odot$, S1' #'Storm, 1'
-    s_2_label = '{:.1e}'.format(objs_pd_r['mstar'][1]) + r' M$_\odot$, S2' #'Storm, 2'
+    cm_1_label = 'CM1' #'{:.1e}'.format(objs_pd_cm['mstar'][0]) + r' M$_\odot$, CM 1' #'Cpt. Marvel, 1'
+    e_1_label = 'E1' #'{:.1e}'.format(objs_pd_e['mstar'][0]) + r' M$_\odot$, E1' #'Elektra, 1'
+    e_2_label = 'E2'#{:.1e}'.format(objs_pd_e['mstar'][1]) + r' M$_\odot$, E2' #'Elektra, 2'
+    r_1_label = 'R1' #'{:.1e}'.format(objs_pd_s['mstar'][0]) + r' M$_\odot$, R1' #'Rogue, 1'
+    r_3_label = 'R3' #{:.1e}'.format(objs_pd_s['mstar'][1]) + r' M$_\odot$, R3' #'Rogue, 3'
+    s_1_label = 'S1' #{:.1e}'.format(objs_pd_r['mstar'][0]) + r' M$_\odot$, S1' #'Storm, 1'
+    s_2_label = 'S2' #{:.1e}'.format(objs_pd_r['mstar'][1]) + r' M$_\odot$, S2' #'Storm, 2'
     zorder_cm_1 = 7
     zorder_e_1 = 3
     zorder_e_2 = 6
@@ -145,6 +161,7 @@ if __name__ == '__main__':
     s = pynbody.load(path + tfile)
     h_dummy = s.halos(dummy = True)
     rvir_e_1 = h_dummy[1].properties['Rvir']
+
     objs_pd_e_1 =  pickle_read(path + tfile+'_1_CGM.data')
     objs_pd_e_1_v =  pickle_read(path + tfile+'_1_CGMvoight.data')
     
@@ -277,7 +294,7 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([0.1, 3, 0.001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.HI_Rvir.png',dpi = dpi)
     
     plt.close()
@@ -305,7 +322,7 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([8, 300, 0.001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.HI_kpc.png',dpi = dpi)
     
     plt.close()
@@ -364,7 +381,7 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([8, 300, 0.001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.CIV_kpc.png',dpi = dpi)
     
     plt.close()
@@ -392,7 +409,7 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([0.1, 3, 0.0001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.SiIV_Rvir.png',dpi = dpi)
     
     plt.close()
@@ -420,7 +437,7 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([8, 300, 0.0001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.SiIV_kpc.png',dpi = dpi)
     
     plt.close()
@@ -448,7 +465,7 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([0.1, 3, 0.001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.OVI_Rvir.png',dpi = dpi)
     
     plt.close()
@@ -476,5 +493,5 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.tight_layout()
     plt.axis([8, 300, 0.001, 2])
-    plt.legend(fontsize = legendsize)
+#    plt.legend(fontsize = legendsize)
     plt.savefig(outbase + '.OVI_kpc.png',dpi = dpi)

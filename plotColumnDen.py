@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
 import matplotlib
 import pynbody, sys
 from pynbody.analysis import profile, angmom, halo
@@ -66,17 +67,17 @@ def plotColumnDen(tfile,halo_num,bordoloidata,burchettdata):
     hfb.gas['hiden'].units = hfb.gas['rho'].units
     plt.close()
     hfbhiim = pynbody.plot.image(hfb.gas[notdiskf],qty='hiden', clear=False,
-        units='m_p cm^-2', width=round(hfbrvir/10)*10*2.5, show_cbar=False, 
-        vmin=1e12,vmax=1e15, log=True)    
+        units='m_p cm^-2', width=np.round(hfbrvir/10)*10*2.5, show_cbar=False, 
+        vmin=1e12,vmax=1e15, log=True, threaded=False)    
     hfb.gas['civif'] = pynbody.analysis.ionfrac.calculate(hfb.gas,ion='civ')
     hfb.gas['civden'] = hfb.gas['rho']*hfb.gas['OxMassFrac']*Carbon/Oxygen*hfb.gas['civif']
     hfb.gas['civden'].units = hfb.gas['rho'].units
     plt.close()
     hfbcivim = pynbody.plot.image(hfb.gas[notdiskf],qty='civden', clear=False,
-        units='12 m_p cm^-2', width=round(hfbrvir/10)*10*2.5, show_cbar=False, 
+        units='12 m_p cm^-2', width=np.round(hfbrvir/10)*10*2.5, show_cbar=False, 
         vmin=1e12,vmax=1e15, log=True)
 
-    rs = make_rs(hfbcivim,round(hfbrvir/10)*10*2.5)/hfbrvir
+    rs = make_rs(hfbcivim,np.round(hfbrvir/10)*10*2.5)/hfbrvir
     #rad_axes = np.log10(rs.flatten() + 1e-6)
     rad_axes = (rs.flatten() + 1e-6)
 
@@ -107,7 +108,7 @@ def plotColumnDen(tfile,halo_num,bordoloidata,burchettdata):
     plt.axis([radius_range[0],radius_range[1],HI_range[0],HI_range[1]])
     plt.xlabel(r'$\rho/R_{vir}$')
     plt.ylabel(r'log N [HI] [cm$^{-2}]$')
-    plt.text(0.6,14.5,r'Log($M_*/M_\odot$) = %.1f'%(np.log10(hfbsmass)),size = legendsize,color = 'k')
+    plt.text(0.8,16.5,r'Log($M_*/M_\odot$) = %.1f'%(np.log10(hfbsmass)),size = legendsize,color = 'k')
     plt.tight_layout()
     plt.savefig(tfile+'.'+str(halo_num)+'.HIprof.png',dpi = dpi)
 
@@ -141,7 +142,7 @@ def plotColumnDen(tfile,halo_num,bordoloidata,burchettdata):
     return civ_rad
 
 if __name__ == '__main__':    
-    if (socket.gethostname() == "quirm"):
+    if (socket.gethostname() == "quirm.math.grinnell.edu"):
         prefix = '/home/christenc/Data/Sims/'
         outprefix = '/home/christenc/Figures/marvel/'
         dataprefix = '/home/christenc/Code/Datafiles/'           
@@ -225,7 +226,7 @@ if __name__ == '__main__':
     tfile_name = 'rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     halo_nums = ['1','3']
     civ_rad_1 = plotColumnDen(tfile,halo_nums[0],bordoloidata,burchettdata)
-    #civ_rad_2 = plotColumnDen(tfile,halo_nums[1],bordoloidata,burchettdata)
+    civ_rad_2 = plotColumnDen(tfile,halo_nums[1],bordoloidata,burchettdata)
 
     tfile = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'elektra.cosmo25cmb.4096g5HbwK1BH.004096'
