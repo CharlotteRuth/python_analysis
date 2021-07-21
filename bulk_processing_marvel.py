@@ -120,6 +120,8 @@ def bulk_processing(tfile,halo_nums):
         index = np.argmin(np.abs(profile_stellar['mass_enc']/max(profile_stellar['mass_enc']) - 0.5))
         r_half = profile_stellar['rbins'].in_units('kpc')[index]
 
+        sfh, bins = pynbody.plot.stars.sfh(halo, filename=None, massform=False, clear=False, legend=False, subplot=False, trange=False, bins=128)
+
         print(np.mean(np.log10(stars['metals']/ZSOLAR)))
         pickle.dump({'haloid': halo_num,
              'z': s.properties['z'],
@@ -149,6 +151,8 @@ def bulk_processing(tfile,halo_nums):
              'M_V': -2.5*np.log10(np.sum(10.**(-0.4*halo.star['v_mag']))), # Padova Simple stellar populations, Maiz-Apellaniz 2006 + Bessell 1990
              'M_B': -2.5*np.log10(np.sum(10.**(-0.4*halo.star['b_mag']))), # Padova Simple stellar populations, Maiz-Apellaniz 2006 + Bessell 1990
              'r_half': r_half, #Stellar half-mass radius
+             'sfh':sfh,
+             'sfhbins':bins,
              'SFR': float(np.sum(stars[filt.LowPass('age','2e8 yr')].star['massform'].in_units('Msol')))/2e8 , # star formation rate averaged over last 200 Myr
              'sigma_v': np.sqrt(float(np.std(halo.star['vx'].in_units('km s^-1')))**2 + float(np.std(halo.star['vy'].in_units('km s^-1')))**2 + float(np.std(halo.star['vz'].in_units('km s^-1')))**2)/np.sqrt(3), #1-d velocity dispersion calculated as 3-d velocity dispersion/sqrt(3)
              'oxh_sfr': oxh_sfr,
@@ -182,47 +186,49 @@ if __name__ == '__main__':
     tfile_name = 'h148.cosmo50PLK.3072g3HbwK1BH.004096'
     tfile = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
     halo_nums = ['1','2','3','5','6','9','10','11','12','14','18','23','26','28','31','34','36','42','57','64','77','94','125','160','252','264','271','304']
-    bulk_processing(tfile,halo_nums)
+    #bulk_processing(tfile,halo_nums)
 
 #Ruth    
     tfile_name = 'h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'
     halo_nums = ['1','2','4','7','17','21','22','27','51','52','70','104','203']
-    bulk_processing(tfile,halo_nums)
+    M200_AHF_tfile = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/ahf_200/h229.cosmo50PLK.3072gst5HbwK1BH.004096'    
+    M200_AHF_halo_nums = ['1','2','3','6','14','15','18','20','22','33','47','48','49','52','57','62','64','89','92','193','528','886','1302','5313']
+    #bulk_processing(M200_AHF_tfile,M200_AHF_halo_nums)
 
 #Sonia    
     tfile_name = 'h242.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'      
     halo_nums = ['1','9','11','24','29','30','33','39','40','45','75','76']
-    #M200 AHF halo_nums = ['1','8','10','21','26','30','34','38','42','69','70','401','421']
-    #bulk_processing(tfile,halo_nums)
+    M200_AHF_tfile = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/ahf_200/h242.cosmo50PLK.3072gst5HbwK1BH.004096' 
+    M200_AHF_halo_nums = ['1','8','10','21','26','30','34','38','42','44','63','69','70','81','138','192','401','421','1633','5495','8816']
+    bulk_processing(M200_AHF_tfile,M200_AHF_halo_nums)
 
 #Elena
     tfile_name = 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     tfile = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     halo_nums = ['1','9','32','126','129']
-    bulk_processing(tfile,halo_nums)
-
+    #bulk_processing(tfile,halo_nums)
     
     tfile = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     halo_nums = ['1','2','4','5','6','7','10','11','13','14','27']
-    bulk_processing(tfile,halo_nums) #yield: 0.02788242
+    #bulk_processing(tfile,halo_nums) #yield: 0.02788242
     
     halo_nums = ['1','3','7','8','10','11','12','16','17','18','30','34','36']
     tfile = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'rogue.cosmo25cmb.4096g5HbwK1BH.004096'
-    bulk_processing(tfile,halo_nums) #yield: 0.02706356
+    #bulk_processing(tfile,halo_nums) #yield: 0.02706356
 
     tfile = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     halo_nums = ['1','2','3','4','5','9','10','11','12','17','18','37']
-    bulk_processing(tfile,halo_nums) #yield: 0.02773383
+    #bulk_processing(tfile,halo_nums) #yield: 0.02773383
 
     tfile = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'storm.cosmo25cmb.4096g5HbwK1BH'
     halo_nums = ['1','2','3','4','5','6','7','8','10','11','13','14','16','17','24','34','35','49','109','125','192','208']   
-    bulk_processing(tfile,halo_nums) #yield: 0.02758432
+    #bulk_processing(tfile,halo_nums) #yield: 0.02758432
 
     tfile = prefix + 'h986.cosmo50cmb.3072g/h986.cosmo50cmb.3072g14HBWK/h986.cosmo50cmb.3072g14HBWK.00512/h986.cosmo50cmb.3072g14HBWK.00512'
     tfile_name = 'h986.cosmo50cmb.3072g14HBWK'
