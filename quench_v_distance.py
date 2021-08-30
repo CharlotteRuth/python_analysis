@@ -68,10 +68,15 @@ def distance_to_nearest_host(tfiles,data):
     hostrvirs = []
     min_massiveHalo = 10**11.5
     sprev = ''
+    tfile_it = -1    
     for i in range(len(data)):
         s = data['sim'].tolist()[i]
+
         print(s,data['haloid'].tolist()[i])       
         if s=='h148' or s=='h229' or s=='h242' or s=='h329': # if sat simulation, find distance to halo 1
+            if s != sprev:
+                tfile_it = tfile_it + 1
+                sprev = s
             h1dist = data['h1dist'].tolist()[i]*0.6776942783267969
             distances.append(h1dist)
        
@@ -92,7 +97,9 @@ def distance_to_nearest_host(tfiles,data):
                 path = '/home/akinshol/Data/Sims/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
 
             if s != sprev:
-                sim = pynbody.load(tfiles[i])
+                sim = pynbody.load(tfiles[tfiles_it])
+                tfile_it = tfile_it + 1
+                sprev = s                
                 h_dummy = sim.halos(dummy = True)
                 loc = []
                 rvir = []
@@ -105,44 +112,12 @@ def distance_to_nearest_host(tfiles,data):
                 
                 loc = np.array(loc)
                 rvir = np.array(rvir)
-                #for index, halo in data.iterrows():
 
             properties = h_dummy[int(data['haloid'].tolist()[i])].properties
             distances.append(min(((properties['Xc'] - loc[:,0])**2 + (properties['Yc'] - loc[:,1])**2 + (properties['Zc'] - loc[:,2])**2)**(0.5)))
             minind = np.where((((properties['Xc'] - loc[:,0])**2 + (properties['Yc'] - loc[:,1])**2 + (properties['Zc'] - loc[:,2])**2)**(0.5)) == distances[-1])
-                #commented out because data file doesn't contain position
-#                distances.append(min(((halo['Xc'] - loc[:,0])**2 + (halo['Yc'] - loc[:,1])**2 + (halo['Zc'] - loc[:,2])**2)**(0.5)))
-#                minind = np.where((((halo['Xc'] - loc[:,0])**2 + (halo['Yc'] - loc[:,1])**2 + (halo['Zc'] - loc[:,2])**2)**(0.5)) == distances[-1])
             hostrvirs.append(rvir[minind]*0.6776942783267969)
-            sprev = s
-                
-#            coords = []
-#            with open(path+'.coords','rb') as f:
-#                while True:
-#                    try:
-#                        coords.append(pickle.load(f)) #,encoding='latin1'))
-#                    except EOFError:
-#                        break
-#            coords = pd.DataFrame(coords)
-           
-#            threshold = 5*10**(11) # this threshold can be adjusted,
-            # i tried to pick something similar to the virial masses of the host in the JL simulations
-           
-#            coords = coords[coords.mass > threshold]
-           
-#            halocoords = np.array([data['Xc'].tolist()[i],data['Yc'].tolist()[i],data['Zc'].tolist()[i]])
 
-#            x = np.array(coords['Xc'])
-#            y = np.array(coords['Yc'])
-#            z = np.array(coords['Zc'])
-#            Rvir = np.array(coords['Rv'])
-            
-#            c = np.array([x,y,z])
-#            c = np.transpose(c)
-#            dist = np.sqrt(np.sum((halocoords-c)**2, axis=1))*0.6776942783267969
-#            distances.append(np.min(dist))
-#            hostrvirs.append(Rvir[np.argmin(dist)]*0.6776942783267969)
-           
     return np.array(distances),np.array(hostrvirs)
 
 
@@ -150,32 +125,41 @@ def distance_to_nearest_host(tfiles,data):
 if __name__ == '__main__':    
     if (socket.gethostname() == "quirm.math.grinnell.edu"):
         prefix = '/home/christenc/Data/Sims/'
-        outprefix = '/home/christenc/Figures/marvel/'
+        outprefix = '/home/christenc/Figures/marvel/marvelJL'
     else:
         prefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
-        outprefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/'
+        outprefix = '/home/christensen/Storage2/UW/MolecH/Cosmo/marvelJL'
     plt.figure(1)
     plt.clf()
 
-    presentation = True #False
+    presentation = False
     if presentation:
-        outbase = outprefix + 'marvel_pres_'
+        outbase = outprefix + '_pres_'
         plt.style.use(['default','/home/christenc/.config/matplotlib/presentation.mplstyle'])
         plt_width = 8 #inches
         aspect_ratio = 3.0/4.0
         legendsize = 16
-        dpi = 100
-        markersize = 40
+        dpi = 200
+        markersize = 100
+        ms_scale = 1
+        lw = mpl.rcParams['lines.linewidth'] - 1
+        edgewidth = 2
     else:
-        outbase = outprefix + 'marvel'
+        outbase = outprefix #+ 'marvel'
         plt.style.use(['default','/home/christenc/.config/matplotlib/article.mplstyle'])
         plt_width = 3.5 #inches
         aspect_ratio = 3.0/4.0
         legendsize = 5
         dpi = 300
-        markersize = 12
-
-    dataprefix = '/home/christenc/Code/Datafiles/'        
+        markersize = 25
+        ms_scale = 0.25
+        lw = mpl.rcParams['lines.linewidth']
+        edgewidth = 0.5
+        
+    if (socket.gethostname() == "ozma.grinnell.edu"):
+        dataprefix = '/home/christensen/Code/Datafiles/' 
+    else:
+        dataprefix = '/home/christenc/Code/Datafiles/'
     f = open(dataprefix+'mstar_vs_mhalo_4Charlotte.txt', 'r')
     fdmdata = []
     for line in f:
@@ -198,66 +182,97 @@ if __name__ == '__main__':
             fdmdata.append(source)
     f.close()
     fdmdata = pd.DataFrame(fdmdata)
+
+    tfile_base_cm = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH'
+    tfile_cm = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096' #'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
+
+    tfile_r = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_base_r = 'rogue.cosmo25cmb.4096g5HbwK1BH'
+
+    tfile_e = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_base_e = 'elektra.cosmo25cmb.4096g5HbwK1BH'
+
+    tfile_s = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_base_s = 'storm.cosmo25cmb.4096g5HbwK1BH'
+    
+    tfile_base_1 = 'h148.cosmo50PLK.3072g3HbwK1BH'
+    tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/snapshots_200bkgdens/h148.cosmo50PLK.3072g3HbwK1BH.004096' #
+    tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
+    
+    tfile_base_1hr = 'h148.cosmo50PLK.6144g3HbwK1BH/'
+    tfile_1hr = prefix + 'h148.cosmo50PLK.6144g/h148.cosmo50PLK.6144g3HbwK1BH/h148.cosmo50PLK.6144g3HbwK1BH.004096/ahf_200/h148.cosmo50PLK.6144g3HbwK1BH.004096'
+    
+    tfile_base_2 = 'h229.cosmo50PLK.3072gst5HbwK1BH'
+    tfile_2 = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h229.cosmo50PLK.3072gst5HbwK1BH.004096' #
+    tfile_2 = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'    
+    
+    tfile_base_3 = 'h242.cosmo50PLK.3072gst5HbwK1BH'
+    tfile_3 = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h242.cosmo50PLK.3072gst5HbwK1BH.004096' #
+    tfile_3 = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'
+
+    tfile_base_4 = 'h329.cosmo50PLK.3072gst5HbwK1BH'
+    tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h329.cosmo50PLK.3072gst5HbwK1BH.004096' #
+    tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
+    
+    tfile_base_4hr = 'h329.cosmo50PLK.6144g5HbwK1BH'
+    tfile_4hr = prefix + 'h329.cosmo50PLK.6144g/h329.cosmo50PLK.6144g5HbwK1BH/h329.cosmo50PLK.6144g5HbwK1BH.004096/ahf_200/h329.cosmo50PLK.6144g5HbwK1BH.004096' #    
+    
+    tfiles = [tfile_cm, tfile_e, tfile_r, tfile_s, tfile_1, tfile_1hr, tfile_2, tfile_3, tfile_4, tfile_4hr]
+    tfile_base = [tfile_base_cm, tfile_base_e, tfile_base_r, tfile_base_s, tfile_base_1, tfile_base_1hr, tfile_base_2, tfile_base_3, tfile_base_4, tfile_base_4hr]
+
+    objs_pd = None 
+    for tfile, base in zip(tfiles, tfile_base):
+        objs_dat = []
+        #print(tfile)
+        f=open(tfile + '.MAP.data', 'rb')
+        while 1:
+            try:
+                objs_dat.append(pickle.load(f))
+            except EOFError:
+                break        
+        f.close()
+        if len(objs_dat) == 1:
+            temp = pd.DataFrame(objs_dat[0])
+        else:
+            temp = pd.DataFrame(objs_dat)
+        simname = base.split('.')[0]
+        if (base.split('.')[2])[0] == '6':
+            simname = simname+'_6144'
+            temp['M_star'] = temp['mstar']
+            temp['mass'] = temp['mvir']
             
-#Sandra 
-    tfile_name = 'h148.cosmo50PLK.3072g3HbwK1BH.004096'
-    tfile = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
-    pointcolor = [1,0,0] #red
-    objs_pd_sandra = pickle_read(tfile + '.MAP.data')
-    objs_pd_sandra['sim'] = ['h148'] * len(objs_pd_sandra)
+        temp['sim'] = [simname]*len(temp)
+        if not 'massiveDist' in temp:
+            temp = distance_to_nearest_host(temp,[tfile])
+            temp.to_pickle(tfile + '.MAP.data')
+
+        if objs_pd is None: 
+            objs_pd = temp
+        else:
+            objs_pd = objs_pd.append(temp, ignore_index = True)     
     
-#Ruth    
-    tfile_name = 'h229.cosmo50PLK.3072gst5HbwK1BH.004096'
-    tfile = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'
-    pointcolor = [0,1,0] #green
-    objs_pd_ruth = pickle_read(tfile + '.MAP.data')
-    objs_pd_ruth['sim'] = ['h229'] * len(objs_pd_ruth)
-
-#Sonia    
-    tfile_name = 'h242.cosmo50PLK.3072gst5HbwK1BH.004096'
-    tfile = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'      
-    pointcolor = [0,0,1] #blue
-    objs_pd_sonia = pickle_read(tfile + '.MAP.data')
-    objs_pd_sonia['sim'] = ['h242'] * len(objs_pd_sonia)
-    
-#Elena
-    tfile_name = 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
-    tfile = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
-    pointcolor = [0.5,0,0.5] #purple
-    objs_pd_elena = pickle_read(tfile + '.MAP.data')
-    objs_pd_elena['sim'] = ['h329'] * len(objs_pd_elena)
-
-#Cpt Marvel
-    tfile = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
-    objs_pd_cm = pickle_read(tfile + '.MAP.data')
-    objs_pd_cm['sim'] = ['cptmarvel'] * len(objs_pd_cm)
-
-#Elektra
-    tfile = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
-    objs_pd_e = pickle_read(tfile + '.MAP.data')
-    objs_pd_e['sim'] = ['elektra'] * len(objs_pd_e)
-
-#Rogue
-    tfile = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
-    objs_pd_r = pickle_read(tfile + '.MAP.data')
-    objs_pd_r['sim'] = ['rogue'] * len(objs_pd_r)
-
-#Storm
-    tfile = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
-    objs_pd_s = pickle_read(tfile + '.MAP.data')
-    objs_pd_s['sim'] = ['storm'] * len(objs_pd_s)
-
-#    objs_pd = [objs_pd_sandra,objs_pd_ruth,objs_pd_sonia,objs_pd_elena,objs_pd_s,objs_pd_r,objs_pd_e,objs_pd_cm]
-    objs_pd = [objs_pd_ruth,objs_pd_sonia,objs_pd_s,objs_pd_r,objs_pd_e,objs_pd_cm]
-    #objs_pd = [objs_pd_sandra,objs_pd_ruth,objs_pd_sonia,objs_pd_elena]
-    objs_pd = pd.concat(objs_pd)
-
     fdmdata_mod = fdmdata.copy()
     objs_pd = match_halos(objs_pd, fdmdata_mod)
     
-    tau90 = np.empty(len(objs_pd))
-    distances, rvir = distance_to_nearest_host(objs_pd, tfiles)
-    objs_pd['distances'] = distances
+    ind = 0
+    tau90 = np.empty(len(objs_pd))            
+    for index, row in objs_pd.iterrows():
+        if len(row['sfhbins']) != len(row['sfh']):
+            xarr = row['sfhbins'][1:] - (row['sfhbins'][1] - row['sfhbins'][0])
+        else:
+            xarr = row['sfhbins'][:]
+        yarr = np.cumsum(row['sfh'])/max(np.cumsum(row['sfh']))
+        if (yarr[0] >= 0.9):
+            tau90[ind] = xarr[0]
+        else:
+            interp = interp1d(yarr, xarr) #, kind='cubic')
+            if np.isnan(interp(0.9)):
+                tau90[ind] = 0
+            else:
+                tau90[ind] = float(interp(0.9))
+        ind = ind + 1            
+
+    objs_pd['tau90'] = tau90
     
     halo_label = {'halo_label': ""}
     objs_pd = objs_pd.join(pd.DataFrame(columns=halo_label))
@@ -269,7 +284,8 @@ if __name__ == '__main__':
     fdmdata = fdmdata.set_index('halo_label') 
 
     objs_pd_comb = pd.concat([objs_pd,fdmdata], join="inner", axis=1)
-    
+
+    '''
     plt.clf()
     plt.figure(1)
     ind = 0
@@ -277,14 +293,14 @@ if __name__ == '__main__':
         if (type(row['sfhbins']) == float):
             tau90[ind] = 0
         else:
-            xarr = row['sfhbins'][1:] - (row['sfhbins'][1] - row['sfhbins'][0])
+            if len(row['sfhbins']) != len(row['sfh']):
+                xarr = row['sfhbins'][1:] - (row['sfhbins'][1] - row['sfhbins'][0])
+            else:
+                xarr = row['sfhbins'][:]
             yarr = np.cumsum(row['sfh'])/max(np.cumsum(row['sfh']))
             plt.clf()
             plt.plot(xarr,yarr)
             plt.plot([0,14],[0.9,0.9])
-        #if np.isnan(interp(0.9)):
-            #print(row)
-            #print(row['sfhbins'],row['sfh'])
             if (yarr[0] >= 0.9):
                 tau90[ind] = xarr[0]
             else:
@@ -292,29 +308,38 @@ if __name__ == '__main__':
                 print(ind,interp(0.9))
                 tau90[ind] = float(interp(0.9))
         ind = ind + 1
+    '''
 
-    cmx = plt.get_cmap("viridis") 
-    cNorm  = colors.Normalize(vmin=0, vmax = 14)
+
     #scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmx)
     plt.clf()
     fig1 = plt.figure(1,figsize = (plt_width,plt_width*aspect_ratio))
+    fig1.clear()
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax1 = fig1.add_subplot(gs[0])
-    ax1sub = fig1.add_subplot(gs[1])    
-    q = ax1.scatter(distances[objs_pd['SFR'] < 1e-11],objs_pd['M_star'][objs_pd['SFR'] < 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] < 1e-11]*2).tolist(), c = tau90[objs_pd['SFR'] < 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D')
-    sf = ax1.scatter(distances[objs_pd['SFR'] >= 1e-11],objs_pd['M_star'][objs_pd['SFR'] >= 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] >= 1e-11]*2).tolist(), c = tau90[objs_pd['SFR'] >= 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k')
+    ax1sub = fig1.add_subplot(gs[1])
+
+    cmx = plt.get_cmap("viridis") 
+    cNorm  = colors.Normalize(vmin=0, vmax = 14)    
+    q = ax1.scatter(objs_pd[objs_pd['SFR'] < 1e-11]['massiveDist'],objs_pd['M_star'][objs_pd['SFR'] < 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] < 1e-11]*2*ms_scale).tolist(), c = tau90[objs_pd['SFR'] < 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D', linewidths = edgewidth)
+    sf = ax1.scatter(objs_pd[objs_pd['SFR'] >= 1e-11]['massiveDist'],objs_pd['M_star'][objs_pd['SFR'] >= 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] >= 1e-11]*2*ms_scale).tolist(), c = tau90[objs_pd['SFR'] >= 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k', linewidths = edgewidth)
     #plt.scatter(objs_pd_e['h1dist'],objs_pd_e['M_star'])
-    ax1.legend([q,sf],['Quenched','Star forming'],scatterpoints = 1,facecolor = 'white',loc = 3,framealpha = 0,frameon = False)    
+    lgnd = ax1.legend([q,sf],['Quenched','Star forming'],scatterpoints = 1,facecolor = 'white',loc = 3,framealpha = 0,frameon = False)
+    lgnd.legendHandles[0]._sizes = [markersize]
+    lgnd.legendHandles[1]._sizes = [markersize]
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.axis([10, 5e3, 1e2, 1e11])
+    ax1.axis([10, 1e4, 1e2, 1e10])
     ax1.set_ylabel(r'M$_*$/M$_\odot$')
     ax1.set_xlabel(r'Distance to massive galaxy (kpc)')
     cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"$\tau_{90}$ (Gyr)")
+    fig1.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig1.tight_layout()
+    fig1.show()
+    fig1.savefig(outbase + '_distance_smass_t90.png',dpi = dpi)    
 
-    plt.savefig(outbase + '.distance_smass_t90.png')    
-
+'''
     fig1= plt.figure() 
     ax1 = fig1.add_subplot(1,1,1)
     ax1.plot(objs_pd_comb['distances'],objs_pd_comb['Mhalo_z0']/objs_pd_comb['Mpeak'],'x')
@@ -322,5 +347,5 @@ if __name__ == '__main__':
     ax1.plot(objs_pd_comb['Mpeak'],objs_pd_comb['Mstar_z0'],'o')
     ax1.set_yscale('log')
     ax1.set_xscale('log')
-
+'''
     

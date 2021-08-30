@@ -7,6 +7,7 @@
 
 #%run /home/christenc/Code/python/python_analysis/SMHM_v_distance
 import matplotlib as mpl
+mpl.use('tkagg')
 import matplotlib.pylab as plt
 import matplotlib.mlab as mlab
 import matplotlib.colors as colors
@@ -69,11 +70,15 @@ def distance_to_nearest_host(data,tfiles):
     massiveDist = []
     min_massiveHalo = 10**11.5
     sprev = ''
-    tfile_it = 0
+    tfile_it = -1
     for i in range(len(data)):
         s = data['sim'].tolist()[i]
-        print(s,data['haloid'].tolist()[i])       
-        if s=='h148' or s=='h229' or s=='h242' or s=='h329': # if sat simulation, find distance to halo 1
+
+        #print(s,data['haloid'].tolist()[i])       
+        if s=='h148' or s=='h229' or s=='h242' or s=='h329': # or s=='h148_6144' or s=='h329_6144': # if sat simulation, find distance to halo 1
+            if s != sprev:
+                tfile_it = tfile_it + 1
+                sprev = s
             h1dist = data['h1dist'].tolist()[i]*0.6776942783267969
             massiveDist.append(h1dist)
        
@@ -83,6 +88,8 @@ def distance_to_nearest_host(data,tfiles):
         else: # if field simulation, find distance to nearest massive DM halo (currently > 0.5e12.5 Msol)
             if s != sprev:
                 sim = pynbody.load(tfiles[tfile_it])
+                tfile_it = tfile_it + 1
+                sprev = s
                 h_dummy = sim.halos(dummy = True)
                 loc = []
                 rvir = []
@@ -98,12 +105,9 @@ def distance_to_nearest_host(data,tfiles):
                 #for index, halo in data.iterrows():
 
             properties = h_dummy[int(data['haloid'].tolist()[i])].properties
-            massiveDist.append(min(((properties['Xc'] - loc[:,0])**2 + (properties['Yc'] - loc[:,1])**2 + (properties['Zc'] - loc[:,2])**2)**(0.5)))
+            massiveDist.append(min(((properties['Xc']/properties['h'] - loc[:,0])**2 + (properties['Yc']/properties['h'] - loc[:,1])**2 + (properties['Zc']/properties['h'] - loc[:,2])**2)**(0.5)))
             minind = np.where((((properties['Xc'] - loc[:,0])**2 + (properties['Yc'] - loc[:,1])**2 + (properties['Zc'] - loc[:,2])**2)**(0.5)) == massiveDist[-1])
             #hostrvirs.append(rvir[minind]*0.6776942783267969)
-            if s != sprev:
-                tfile_it = tfile_it + 1
-            sprev = s
 
     data['massiveDist'] = massiveDist
     return data
@@ -113,18 +117,22 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     if presentation:
         outfile_base = outfile_base + '_pres'
         plt.style.use(['default','/home/christenc/.config/matplotlib/presentation.mplstyle'])
-        plt_width = 16 #8 #inches
+        plt_width = 8 #inches
         aspect_ratio = 3.0/4.0
         legendsize = 16
-        dpi = 100
-        lw = mpl.rcParams['lines.linewidth'] - 1        
+        dpi = 200
+        markersize = 100
+        lw = mpl.rcParams['lines.linewidth'] - 1
+        edgewidth = 2
     else:
         plt.style.use(['default','/home/christenc/.config/matplotlib/article.mplstyle'])
         plt_width = 3.5 #inches
         aspect_ratio = 3.0/4.0
         legendsize = 5
         dpi = 300
-        lw = mpl.rcParams['lines.linewidth']    
+        markersize = 25
+        lw = mpl.rcParams['lines.linewidth']
+        edgewidth = 0.7
 
     if (socket.gethostname() == "ozma.grinnell.edu"):
         dataprefix = '/home/christensen/Code/Datafiles/' 
@@ -163,6 +171,21 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     f.close()
     readdata = pd.DataFrame(readdata)
 
+    #Read data from Justin Read's abundance matching, provided by Ferah
+    f = open(dataprefix+'mstar-mhalo-field.txt', 'r')
+    read_abunmatch = []
+    for line in f:
+        line = line.strip()
+        columns = line.split()
+        if len(columns) == 3:
+            source = {}
+            source['M200'] = float(columns[0])
+            source['Mstar_low'] = float(columns[1])
+            source['Mstar_high'] = float(columns[2])
+            read_abunmatch.append(source)
+    f.close()
+    read_abunmatch = pd.DataFrame(read_abunmatch)
+    
     f = open(dataprefix+'mstar_vs_mhalo_4Charlotte.txt', 'r')
     fdmdata = []
     for line in f:
@@ -189,7 +212,7 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     objs_pd = None 
     for tfile, base in zip(tfiles, tfile_base):
         objs_dat = []
-        print(tfile)
+        #print(tfile)
         f=open(tfile + '.MAP.data', 'rb')
         while 1:
             try:
@@ -197,8 +220,20 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
             except EOFError:
                 break        
         f.close()
-        temp = pd.DataFrame(objs_dat)
-        temp['sim'] = [base.split('.')[0]]*len(objs_dat)
+        if len(objs_dat) == 1:
+            temp = pd.DataFrame(objs_dat[0])
+        else:
+            temp = pd.DataFrame(objs_dat)
+        simname = base.split('.')[0]
+        if (base.split('.')[2])[0] == '6':
+            simname = simname+'_6144'
+            temp['M_star'] = temp['mstar']
+            temp['mass'] = temp['mvir']
+            
+        temp['sim'] = [simname]*len(temp)
+        if not 'massiveDist' in temp:
+            temp = distance_to_nearest_host(temp,[tfile])
+            temp.to_pickle(tfile + '.MAP.data')
 
         if objs_pd is None: 
             objs_pd = temp
@@ -206,9 +241,8 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
             objs_pd = objs_pd.append(temp, ignore_index = True)       
 
     fdmdata_mod = fdmdata.copy()
-    objs_pd = match_halos(objs_pd, fdmdata_mod)    
-            
-    objs_pd = distance_to_nearest_host(objs_pd, tfiles)
+    objs_pd = match_halos(objs_pd, fdmdata_mod)               
+    #objs_pd = distance_to_nearest_host(objs_pd, tfiles)
     
     """
         h_dummy = s.halos(dummy = True)
@@ -228,22 +262,22 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
         else:
             objs_pd = objs_pd.append(temp, ignore_index = True)
     """
-
+ 
     ind = 0
     tau90 = np.empty(len(objs_pd))            
     for index, row in objs_pd.iterrows():
-        xarr = row['sfhbins'][1:] - (row['sfhbins'][1] - row['sfhbins'][0])
+        if len(row['sfhbins']) != len(row['sfh']):
+            xarr = row['sfhbins'][1:] - (row['sfhbins'][1] - row['sfhbins'][0])
+        else:
+            xarr = row['sfhbins'][:]
         yarr = np.cumsum(row['sfh'])/max(np.cumsum(row['sfh']))
         if (yarr[0] >= 0.9):
             tau90[ind] = xarr[0]
         else:
             interp = interp1d(yarr, xarr) #, kind='cubic')
             if np.isnan(interp(0.9)):
-                print(row)
-                print(row['sfhbins'],row['sfh'])
                 tau90[ind] = 0
             else:
-                print(ind,interp(0.9))
                 tau90[ind] = float(interp(0.9))
         ind = ind + 1            
 
@@ -261,17 +295,19 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     objs_pd_comb = pd.concat([objs_pd,fdmdata], join="inner", axis=1)
         
     #SMHM colored by tau_90
-    #fig1.clear()
+    #ig1.clear()
+    plt.clf()
     fig1 = plt.figure(1,figsize=(plt_width,plt_width*aspect_ratio))
+    fig1.clear()
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax1 = fig1.add_subplot(gs[0])
     ax1sub = fig1.add_subplot(gs[1])
-
     cmx = plt.get_cmap("viridis") 
-    cNorm  = colors.Normalize(vmin=0, vmax = 14)    
-    sat_v_tau90 = ax1.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Satellite'], cmap = cmx, norm = cNorm,edgecolor = 'k')
-    cen_v_tau90 = ax1.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Central'], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D')
-    ax1.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    cNorm  = colors.Normalize(vmin=0, vmax = 14)
+    ax1.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9],color = 'grey', alpha = 0.5)
+    cen_v_tau90 = ax1.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Central'], cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    sat_v_tau90 = ax1.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Satellite'], cmap = cmx, norm = cNorm, edgecolor = 'k',marker = "*", s = markersize*1.5, linewidths = edgewidth)
+    #ax1.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax1.set_xscale('log')
     ax1.set_yscale('log')
     ax1.set_ylabel(r'M$_*$/M$_\odot$')
@@ -280,81 +316,123 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     ax1.legend([cen_v_tau90,sat_v_tau90],['Central','Satellite'],scatterpoints = 1,facecolor = 'white',loc = 0,framealpha = 0,frameon = False) 
     cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"$\tau_{90}$ (Gyr)")
-    plt.savefig(outfile_base + '_SMHM_t90.png')
+    fig1.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig1.tight_layout()
+    fig1.show()
+    fig1.savefig(outfile_base + '_SMHM_t90.png',dpi = dpi)
 
     #SMHM colored by tau_90
+    #plt.clf()
+    fig1 = plt.figure(1,figsize=(plt_width,plt_width*aspect_ratio))
     fig1.clear()
-    fig1a = plt.figure(10,figsize=(plt_width,plt_width*aspect_ratio))
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
-    ax1 = fig1a.add_subplot(gs[0])
-    ax1sub = fig1a.add_subplot(gs[1])
-
+    ax1 = fig1.add_subplot(gs[0])
+    ax1sub = fig1.add_subplot(gs[1])
     cmx = plt.get_cmap("viridis") 
     cNorm  = colors.Normalize(vmin=0, vmax = 14)    
-    sat_v_tau90 = ax1.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['Mstar_Mpeak'][objs_pd_comb['type']=='Satellite'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Satellite'], cmap = cmx, norm = cNorm,edgecolor = 'k')
-    cen_v_tau90 = ax1.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['Mstar_Mpeak'][objs_pd_comb['type']=='Central'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Central'], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D')
-    ax1.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax1.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9],color = 'grey')
+    cen_v_tau90 = ax1.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['Mstar_z0'][objs_pd_comb['type']=='Central'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Central'], cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    sat_v_tau90 = ax1.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['Mstar_z0'][objs_pd_comb['type']=='Satellite'],c = objs_pd_comb['tau90'][objs_pd_comb['type']=='Satellite'], cmap = cmx, norm = cNorm,edgecolor = 'k',marker="*", s = markersize*1.5, linewidths = edgewidth)
+    #ax1.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.set_ylabel(r'M$_*$/M$_\odot$')
+    ax1.set_ylabel(r'M$_{*, z = 0}$/M$_\odot$')
     ax1.set_xlabel(r'M$_{\mathrm{vir, peak}}$/M$_\odot$')
-    # ax1.axis([2e6, 2e11, 2e2, 5e9])
     ax1.axis([1e8, 2e11, 2e2, 5e9])
     ax1.legend([cen_v_tau90,sat_v_tau90],['Central','Satellite'],scatterpoints = 1,facecolor = 'white',loc = 0,framealpha = 0,frameon = False) 
     cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"$\tau_{90}$ (Gyr)")
-    plt.savefig(outfile_base + '_SMHM_t90_Mpeak.png')
+    fig1.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig1.tight_layout()
+    fig1.show()    
+    fig1.savefig(outfile_base + '_SMHM_t90_Mpeak.png',dpi = dpi)
     
     #SMHM colored by distance to massive galaxy
-    #fig2.clear()
+    #plt.clf()
     fig2 = plt.figure(2,figsize=(plt_width,plt_width*aspect_ratio))
+    fig2.clear()
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax2 = fig2.add_subplot(gs[0])
     ax2sub = fig2.add_subplot(gs[1])
-
-    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)    
-    ax2.scatter(objs_pd['mass'],objs_pd['M_star'],c = np.log10(objs_pd['massiveDist']), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax2.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)
+    ax2.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9],color = 'grey')
+    ax2.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax2.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k',marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    #ax2.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax2.set_xscale('log')
     ax2.set_yscale('log')
     ax2.set_ylabel(r'M$_*$/M$_\odot$')
     ax2.set_xlabel(r'M$_{\mathrm{vir}}$/M$_\odot$')
     ax2.axis([2e6, 2e11, 2e2, 5e9])
+    ax2.legend([cen_v_tau90,sat_v_tau90],['Central','Satellite'],scatterpoints = 1,facecolor = 'white',loc = 0,framealpha = 0,frameon = False) 
     cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
-    cb.set_label(r"Log(Distance to Massive Galaxy/1 kpc)")
-    plt.savefig(outfile_base + '_SMHM_rMassGal.png')
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig2.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig2.tight_layout()
+    fig2.show()    
+    fig2.savefig(outfile_base + '_SMHM_rMassGal.png',dpi = dpi)
 
     #SMHM colored by distance to massive galaxy
+    #plt.clf()
     fig2.clear()
     fig2 = plt.figure(2,figsize=(plt_width,plt_width*aspect_ratio))
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax2 = fig2.add_subplot(gs[0])
     ax2sub = fig2.add_subplot(gs[1])
-
-    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)    
-    ax2.scatter(objs_pd_comb['Mpeak'],objs_pd_comb['Mstar_Mpeak'],c = np.log10(objs_pd_comb['massiveDist']), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax2.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)
+    ax2.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9],color = 'grey')
+    ax2.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['Mstar_z0'][objs_pd_comb['type']=='Central'],c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)    
+    ax2.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['Mstar_z0'][objs_pd_comb['type']=='Satellite'],c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = "*", s = markersize*1.5, linewidths = edgewidth)
+    #ax2.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax2.set_xscale('log')
     ax2.set_yscale('log')
-    ax2.set_ylabel(r'M$_*$/M$_\odot$')
+    ax2.set_ylabel(r'M$_{*, z = 0}$/M$_\odot$')
     ax2.set_xlabel(r'M$_{\mathrm{vir, peak}}$/M$_\odot$')
-    #ax2.axis([2e6, 2e11, 2e2, 5e9])
     ax2.axis([1e8, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
-    cb.set_label(r"Log(Distance to Massive Galaxy/1 kpc)")
-    plt.savefig(outfile_base + '_SMHM_rMassGal_Mpeak.png')
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig2.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig2.tight_layout()
+    fig2.show() 
+    fig2.savefig(outfile_base + '_SMHM_rMassGal_Mpeak.png',dpi = dpi)
+
+    #plt.clf()
+    fig2.clear()
+    fig2 = plt.figure(2,figsize=(plt_width,plt_width*aspect_ratio))
+    gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
+    ax2 = fig2.add_subplot(gs[0])
+    ax2sub = fig2.add_subplot(gs[1])
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)
+    ax2.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],color = 'grey', alpha = 0.5)
+    ax2.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central']/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)    
+    ax2.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite']/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = "*", s = markersize*1.5, linewidths = edgewidth)
+    #ax2.scatter(readdata['M200']*1e10,readdata['M_*']*1e7/(readdata['M200']*1e10),marker = '+',c = 'k')
+    ax2.set_xscale('log')
+    ax2.set_yscale('log')
+    ax2.set_ylabel(r'M$_{*, z = 0}$/M$_{\mathrm{vir, peak}}$')
+    ax2.set_xlabel(r'M$_{\mathrm{vir, peak}}$/M$_\odot$')
+    ax2.axis([1e8, 2e11, 1e-6, 0.05])
+    cb = mpl.colorbar.ColorbarBase(ax2sub, cmap=cmx, norm=cNorm)
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig2.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig2.tight_layout()
+    fig2.show() 
+    fig2.savefig(outfile_base + '_SMHMr_rMassGal_Mpeak.png',dpi = dpi)
     
     #SMHM colored by HI mass
-    #fig3.clear()
+    #plt.clf()
     fig3 = plt.figure(3,figsize=(plt_width,plt_width*aspect_ratio))
+    fig3.clear()
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax3 = fig3.add_subplot(gs[0])
-    ax3sub = fig3.add_subplot(gs[1])
-    
-    cNorm  = colors.Normalize(vmin=2, vmax = 10)
-    ax3.scatter(objs_pd['mass'],objs_pd['M_star'] ,edgecolor = 'k',facecolor = 'none')    
-    ax3.scatter(objs_pd['mass'],objs_pd['M_star'],c = np.log10(np.array(objs_pd['mHI'].tolist())), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax3.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax3sub = fig3.add_subplot(gs[1])    
+    cNorm  = colors.Normalize(vmin=2.0, vmax = 10.0)
+    ax3.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],color = 'grey', alpha = 0.5)
+    ax3.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] ,edgecolor = 'k',facecolor = 'none', s = markersize*1, linewidths = edgewidth)    
+    ax3.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = np.log10(np.array(objs_pd_comb['mHI'][objs_pd_comb['type']=='Central'].tolist())), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)  
+    ax3.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] ,edgecolor = 'k',facecolor = 'none',marker = '*', s = markersize*1.5, linewidths = edgewidth)    
+    ax3.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = np.log10(np.array(objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite'].tolist())), cmap = cmx, norm = cNorm,edgecolor = 'k',marker = '*', s = markersize*1.5, linewidths = edgewidth)  
+    #ax3.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax3.set_xscale('log')
     ax3.set_yscale('log')
     ax3.set_ylabel(r'M$_*$/M$_\odot$')
@@ -362,38 +440,49 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     ax3.axis([2e6, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax3sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"M$_{\mathrm{HI}}$ [M$_\odot$]")
-    plt.savefig(outfile_base + '_SMHM_mHI.png')
+    fig3.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig3.tight_layout()
+    fig3.show()
+    fig3.savefig(outfile_base + '_SMHM_mHI.png',dpi = dpi)
 
+    #plt.clf()
     fig3.clear()
     fig3 = plt.figure(3,figsize=(plt_width,plt_width*aspect_ratio))
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax3 = fig3.add_subplot(gs[0])
-    ax3sub = fig3.add_subplot(gs[1])
-    
+    ax3sub = fig3.add_subplot(gs[1])    
     cNorm  = colors.Normalize(vmin=2, vmax = 10)
-    ax3.scatter(objs_pd_comb['Mpeak'],objs_pd_comb['Mstar_Mpeak'] ,edgecolor = 'k',facecolor = 'none')    
-    ax3.scatter(objs_pd_comb['Mpeak'],objs_pd_comb['Mstar_Mpeak'],c = np.log10(np.array(objs_pd_comb['mHI'].tolist())), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax3.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax3.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],color = 'grey', alpha = 0.5)
+    ax3.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] ,edgecolor = 'k',facecolor = 'none', s = markersize*1, linewidths = edgewidth)    
+    ax3.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = np.log10(np.array(objs_pd_comb['mHI'][objs_pd_comb['type']=='Central'].tolist())), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax3.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] ,edgecolor = 'k',facecolor = 'none', marker = '*', s = markersize*1.5, linewidths = edgewidth)    
+    ax3.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = np.log10(np.array(objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite'].tolist())), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    #ax3.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax3.set_xscale('log')
     ax3.set_yscale('log')
     ax3.set_ylabel(r'M$_*$/M$_\odot$')
     ax3.set_xlabel(r'M$_{\mathrm{vir, peak}}$/M$_\odot$')
-    ax3.axis([2e6, 2e11, 2e2, 5e9])
+    #ax3.axis([2e6, 2e11, 2e2, 5e9])
+    ax3.axis([1e8, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax3sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"M$_{\mathrm{HI}}$ [M$_\odot$]")
-    plt.savefig(outfile_base + '_SMHM_mHI_Mpeak.png')
+    fig3.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig3.tight_layout()
+    fig3.show()
+    fig3.savefig(outfile_base + '_SMHM_mHI_Mpeak.png',dpi = dpi)
    
-
-    #SMHM colored by HI fraction
-    #fig4.clear()
+    #SMHM colored by HI fraction ###############################
+    #plt.clf()
     fig4 = plt.figure(4,figsize=(plt_width,plt_width*aspect_ratio))
+    fig4.clear()
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax4 = fig4.add_subplot(gs[0])
-    ax4sub = fig4.add_subplot(gs[1])
-    
+    ax4sub = fig4.add_subplot(gs[1])    
     cNorm  = colors.Normalize(vmin=0, vmax = 1)
-    ax4.scatter(objs_pd['mass'],objs_pd['M_star'],c = objs_pd['mHI']/(objs_pd['M_star'] + objs_pd['mHI']), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax4.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax4.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9]/read_abunmatch['M200'][read_abunmatch['M200']> 1e9],color = 'grey', alpha = 0.5)
+    ax4.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = objs_pd_comb['mHI'][objs_pd_comb['type']=='Central']/(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax4.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite']/(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    #ax4.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax4.set_xscale('log')
     ax4.set_yscale('log')
     ax4.set_ylabel(r'M$_*$/M$_\odot$')
@@ -401,17 +490,21 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     ax4.axis([2e6, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax4sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"M$_{\mathrm{HI}}$/(M$_*$ + M$_{\mathrm{HI}}$)")
-    plt.savefig(outfile_base + '_SMHM_fHI.png')
+    fig4.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig4.tight_layout()
+    fig4.show()
+    fig4.savefig(outfile_base + '_SMHM_fHI.png',dpi = dpi)
 
     fig4.clear()
     fig4 = plt.figure(4,figsize=(plt_width,plt_width*aspect_ratio))
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax4 = fig4.add_subplot(gs[0])
-    ax4sub = fig4.add_subplot(gs[1])
-    
+    ax4sub = fig4.add_subplot(gs[1])    
     cNorm  = colors.Normalize(vmin=0, vmax = 1)
-    ax4.scatter(objs_pd_comb['Mpeak'],objs_pd_comb['Mstar_Mpeak'],c = objs_pd_comb['mHI']/(objs_pd_comb['M_star'] + objs_pd_comb['mHI']), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax4.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax4.fill_between(read_abunmatch['M200'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_low'][read_abunmatch['M200']> 1e9],read_abunmatch['Mstar_high'][read_abunmatch['M200']> 1e9],color = 'grey', alpha = 0.5)
+    ax4.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],c = objs_pd_comb['mHI'][objs_pd_comb['type']=='Central']/(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax4.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],c = objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite']/(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k',marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    #ax4.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax4.set_xscale('log')
     ax4.set_yscale('log')
     ax4.set_ylabel(r'M$_*$/M$_\odot$')
@@ -419,65 +512,180 @@ def SMHM_v_distance(tfiles,outfile_base,tfile_base,*halo_nums):
     ax4.axis([1e8, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax4sub, cmap=cmx, norm=cNorm)
     cb.set_label(r"M$_{\mathrm{HI}}$/(M$_*$ + M$_{\mathrm{HI}}$)")
-    plt.savefig(outfile_base + '_SMHM_fHI_Mpeak.png')   
+    fig4.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig4.tight_layout()
+    fig4.show()
+    fig4.savefig(outfile_base + '_SMHM_fHI_Mpeak.png',dpi = dpi)   
     
-    #Baryonic mass in disk vs. halo mass, colored by distance to massive galaxy
-    #fig5.clear()
+    #Baryonic mass in disk vs. halo mass, colored by distance to massive galaxy ###############################
     fig5 = plt.figure(5,figsize=(plt_width,plt_width*aspect_ratio))
+    fig5.clear()
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax5 = fig5.add_subplot(gs[0])
     ax5sub = fig5.add_subplot(gs[1])
-
     cNorm  = colors.Normalize(vmin=1.5, vmax = 4)    
-    ax5.scatter(objs_pd['mass'],(objs_pd['M_star'] + objs_pd['mHI']),c = np.log10(objs_pd['massiveDist']), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax5.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax5.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    ax5.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    #ax5.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax5.set_xscale('log')
     ax5.set_yscale('log')
     ax5.set_ylabel(r'M$_*$ + M$_{\mathrm{HI}}$ [M$_\odot$]')
     ax5.set_xlabel(r'M$_{\mathrm{vir}}$ [M$_\odot$]')
     ax5.axis([2e6, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax5sub, cmap=cmx, norm=cNorm)
-    cb.set_label(r"Log(Distance to Massive Galaxy/1 kpc)")
-    plt.savefig(outfile_base + '_BMHM_rMassGal.png')
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig5.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig5.tight_layout()
+    fig5.show()
+    fig5.savefig(outfile_base + '_BMHM_rMassGal.png',dpi = dpi)
 
     fig5.clear()
     fig5 = plt.figure(5,figsize=(plt_width,plt_width*aspect_ratio))
     gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
     ax5 = fig5.add_subplot(gs[0])
     ax5sub = fig5.add_subplot(gs[1])
-
     cNorm  = colors.Normalize(vmin=1.5, vmax = 4)    
-    ax5.scatter(objs_pd_comb['Mpeak'],(objs_pd_comb['M_star'] + objs_pd_comb['mHI']),c = np.log10(objs_pd_comb['massiveDist']), cmap = cmx, norm = cNorm,edgecolor = 'k')
-    ax5.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax5.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax5.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker="*", s = markersize*1.5, linewidths = edgewidth)
+    #ax5.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     ax5.set_xscale('log')
     ax5.set_yscale('log')
     ax5.set_ylabel(r'M$_*$ + M$_{\mathrm{HI}}$ [M$_\odot$]')
     ax5.set_xlabel(r'M$_{\mathrm{vir, peak}}$ [M$_\odot$]')
     ax5.axis([1e8, 2e11, 2e2, 5e9])
     cb = mpl.colorbar.ColorbarBase(ax5sub, cmap=cmx, norm=cNorm)
-    cb.set_label(r"Log(Distance to Massive Galaxy/1 kpc)")
-    plt.savefig(outfile_base + '_BMHM_rMassGal_Mpeak.png')
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig5.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig5.tight_layout()
+    fig5.show()
+    fig5.savefig(outfile_base + '_BMHM_rMassGal_Mpeak.png',dpi = dpi)
     
-    #Baryon fraction vs distance
-    #fig6.clear()
+    # Baryon fraction vs distance ###############################
     fig6 = plt.figure(6,figsize=(plt_width,plt_width*aspect_ratio))
+    fig6.clear()
     gs = gridspec.GridSpec(1,1)
     ax6 = fig6.add_subplot(gs[0])
-
-    ax6.scatter(objs_pd['massiveDist'],(objs_pd['M_star'] + objs_pd['mHI'])/objs_pd['mass'],facecolor = 'none',edgecolor = 'k')
-    fbary = ax6.scatter(objs_pd['massiveDist'],(objs_pd['M_star'] + objs_pd['mHI'])/objs_pd['mass'],edgecolor = 'k',facecolor = 'k',alpha = 0.3)
-    ax6.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central'])/objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],facecolor = 'none',edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central'])/objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],edgecolor = 'k',facecolor = 'k',alpha = 0.3, s = markersize*1, linewidths = edgewidth)
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central']/objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],facecolor = 'none',edgecolor = 'red', s = markersize*1, linewidths = edgewidth)
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite'])/objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],facecolor = 'none',edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    fbary = ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite'])/objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],edgecolor = 'k',facecolor = 'k',alpha = 0.3, marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    #ax6.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
     #ax6.scatter(objs_pd['massiveDist'],objs_pd['mHI']/objs_pd['mass'],facecolor = 'none',edgecolor = 'k')
-    fstar = ax6.scatter(objs_pd['massiveDist'],objs_pd['M_star']/objs_pd['mass'],facecolor = 'none',edgecolor = 'red')
+    fstar = ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite']/objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],facecolor = 'none',edgecolor = 'red', marker = '*', s = markersize*1.5, linewidths = edgewidth)
     ax6.set_xscale('log')
     ax6.set_yscale('log')
     ax6.set_ylabel(r'M/M$_{\mathrm{vir}}$')
-    ax6.set_xlabel(r'Log(Distance to Massive Galaxy/1 kpc)')
-    ax6.axis([20, 7e3, 1e-7, 0.2])
+    ax6.set_xlabel(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    ax6.axis([20, 9e3, 1e-7, 0.2])
     ax6.legend([fbary,fstar],[r'(M$_*$ + M$_{\mathrm{HI}})$/M$_{\mathrm{vir}}$',r'M$_*$/M$_{\mathrm{vir}}$'],loc = 3)
-    plt.savefig(outfile_base + '_fbary_rMassGal.png')
+    fig6.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig6.tight_layout()
+    fig6.show()
+    fig6.savefig(outfile_base + '_fbary_rMassGal.png',dpi = dpi)
+
+    fig6.clear()
+    fig6 = plt.figure(6,figsize=(plt_width,plt_width*aspect_ratio))
+    gs = gridspec.GridSpec(1,1)
+    ax6 = fig6.add_subplot(gs[0])
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central'])/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],facecolor = 'none',edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Central'])/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],edgecolor = 'k',facecolor = 'k',alpha = 0.3, s = markersize*1, linewidths = edgewidth)
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Central']/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],facecolor = 'none',edgecolor = 'red', s = markersize*1, linewidths = edgewidth)
+    ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite'])/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],facecolor = 'none',edgecolor = 'k',marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    fbary = ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'] + objs_pd_comb['mHI'][objs_pd_comb['type']=='Satellite'])/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],edgecolor = 'k',facecolor = 'k',alpha = 0.3,marker = '*', s = markersize*1.5, linewidths = edgewidth)    
+    #ax6.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    #ax6.scatter(objs_pd['massiveDist'],objs_pd['mHI']/objs_pd['mass'],facecolor = 'none',edgecolor = 'k')
+    fstar = ax6.scatter(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite'],objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite']/objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],facecolor = 'none',edgecolor = 'red', marker = "*", s = markersize*1.5, linewidths = edgewidth)
+    ax6.set_xscale('log')
+    ax6.set_yscale('log')
+    ax6.set_ylabel(r'M/M$_{\mathrm{vir, peak}}$')
+    ax6.set_xlabel(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    ax6.axis([20, 9e3, 1e-7, 0.2])
+    ax6.legend([fbary,fstar],[r'(M$_*$ + M$_{\mathrm{HI}})$/M$_{\mathrm{vir}}$',r'M$_*$/M$_{\mathrm{vir}}$'],loc = 3)
+    fig6.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig6.tight_layout()
+    fig6.show()
+    fig6.savefig(outfile_base + '_fbary_rMassGal_Mpeak.png',dpi = dpi)
+
+    fig7 = plt.figure(7,figsize=(plt_width,plt_width*aspect_ratio))
+    fig7.clear()
+    gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
+    ax7 = fig7.add_subplot(gs[0])
+    ax7sub = fig7.add_subplot(gs[1]) 
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)    
+    ax7.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Central'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Central']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax7.scatter(objs_pd_comb['Mpeak'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Satellite']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    ax7.set_xscale('log')
+    ax7.set_ylabel(r'B-V')
+    ax7.set_xlabel(r'M$_{\mathrm{vir}}$ [M$_\odot$]')
+    ax7.axis([1e8, 1e11, 0, 0.8])
+    cb = mpl.colorbar.ColorbarBase(ax7sub, cmap=cmx, norm=cNorm)
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig7.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig7.tight_layout()
+    fig7.show()
+    fig7.savefig(outfile_base + '_BV_Mpeak.png',dpi = dpi)
+
+    fig7.clear()
+    fig7 = plt.figure(7,figsize=(plt_width,plt_width*aspect_ratio))
+    gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
+    ax7 = fig7.add_subplot(gs[0])
+    ax7sub = fig7.add_subplot(gs[1])
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)
+    ax7.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Central'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Central']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax7.scatter(objs_pd_comb['mass'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Satellite']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    ax7.set_xscale('log')
+    ax7.set_ylabel(r'B-V')
+    ax7.set_xlabel(r'M$_{\mathrm{vir}}$ [M$_\odot$]')
+    ax7.axis([1e8, 1e11, 0, 0.8])
+    cb = mpl.colorbar.ColorbarBase(ax7sub, cmap=cmx, norm=cNorm)
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig7.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig7.tight_layout()
+    fig7.show()
+    fig7.savefig(outfile_base + '_BV_Mvir.png',dpi = dpi)
+
+    fig7.clear()
+    fig7 = plt.figure(7,figsize=(plt_width,plt_width*aspect_ratio))
+    gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
+    ax7 = fig7.add_subplot(gs[0])
+    ax7sub = fig7.add_subplot(gs[1]) 
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)
+    ax7.scatter(objs_pd_comb['M_star'][objs_pd_comb['type']=='Central'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Central']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax7.scatter(objs_pd_comb['M_star'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Satellite']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    ax7.set_xscale('log')
+    ax7.set_ylabel(r'B-V')
+    ax7.set_xlabel(r'M$_{\mathrm{star}}$ [M$_\odot$]')
+    ax7.axis([1e3, 5e9, 0.05, 0.8])   
+    cb = mpl.colorbar.ColorbarBase(ax7sub, cmap=cmx, norm=cNorm)
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig7.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig7.tight_layout()
+    fig7.show()
+    fig7.savefig(outfile_base + '_BV_Mstar.png',dpi = dpi)
+
+    fig7.clear()
+    fig7 = plt.figure(7,figsize=(plt_width,plt_width*aspect_ratio))
+    gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
+    ax7 = fig7.add_subplot(gs[0])
+    ax7sub = fig7.add_subplot(gs[1]) 
+    cNorm  = colors.Normalize(vmin=1.5, vmax = 4)
+    ax7.scatter(objs_pd_comb['Mstar_Mpeak'][objs_pd_comb['type']=='Central'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Central']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Central']), cmap = cmx, norm = cNorm,edgecolor = 'k', s = markersize*1, linewidths = edgewidth)
+    ax7.scatter(objs_pd_comb['Mstar_Mpeak'][objs_pd_comb['type']=='Satellite'],(objs_pd_comb['B-V'][objs_pd_comb['type']=='Satellite']),c = np.log10(objs_pd_comb['massiveDist'][objs_pd_comb['type']=='Satellite']), cmap = cmx, norm = cNorm,edgecolor = 'k', marker = '*', s = markersize*1.5, linewidths = edgewidth)
+    #ax5.scatter(readdata['M200']*1e10,readdata['M_*']*1e7,marker = '+',c = 'k')
+    ax7.set_xscale('log')
+    ax7.set_ylabel(r'B-V')
+    ax7.set_xlabel(r'M$_{\mathrm{star, peak}}$ [M$_\odot$]')
+    ax7.axis([1e3, 5e9, 0.05, 0.8])
+    cb = mpl.colorbar.ColorbarBase(ax7sub, cmap=cmx, norm=cNorm)
+    cb.set_label(r"Log(D$_{\mathrm{massive}}$/1 kpc)")
+    fig7.set_size_inches(plt_width,plt_width*aspect_ratio)
+    fig7.tight_layout()
+    fig7.show()
+    fig7.savefig(outfile_base + '_BV_Mstarpeak.png',dpi = dpi)    
     
     
+        
 if __name__ == '__main__':
     if (socket.gethostname() == "quirm.math.grinnell.edu"):
         prefix = '/home/christenc/Data/Sims/'
@@ -500,7 +708,10 @@ if __name__ == '__main__':
     
     tfile_base_1 = 'h148.cosmo50PLK.3072g3HbwK1BH'
     tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/snapshots_200bkgdens/h148.cosmo50PLK.3072g3HbwK1BH.004096' #
-    tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'    
+    tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
+    
+    tfile_base_1hr = 'h148.cosmo50PLK.6144g3HbwK1BH/'
+    tfile_1hr = prefix + 'h148.cosmo50PLK.6144g/h148.cosmo50PLK.6144g3HbwK1BH/h148.cosmo50PLK.6144g3HbwK1BH.004096/ahf_200/h148.cosmo50PLK.6144g3HbwK1BH.004096'
     
     tfile_base_2 = 'h229.cosmo50PLK.3072gst5HbwK1BH'
     tfile_2 = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h229.cosmo50PLK.3072gst5HbwK1BH.004096' #
@@ -514,6 +725,10 @@ if __name__ == '__main__':
     tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h329.cosmo50PLK.3072gst5HbwK1BH.004096' #
     tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     
+    tfile_base_4hr = 'h329.cosmo50PLK.6144g5HbwK1BH'
+    tfile_4hr = prefix + 'h329.cosmo50PLK.6144g/h329.cosmo50PLK.6144g5HbwK1BH/h329.cosmo50PLK.6144g5HbwK1BH.004096/ahf_200/h329.cosmo50PLK.6144g5HbwK1BH.004096' #    
+    
     outfile_base = prefix_outfile + 'marvelJL'
-    #SMHM_v_distance([tfile_1,tfile_2,tfile_3,tfile_4],outfile_base,[tfile_base_1,tfile_base_2,tfile_base_3,tfile_base_4])
-    SMHM_v_distance([tfile_cm, tfile_e, tfile_r, tfile_s, tfile_1,tfile_2,tfile_3,tfile_4],outfile_base,[tfile_base_cm, tfile_base_e, tfile_base_r, tfile_base_s, tfile_base_1,tfile_base_2,tfile_base_3,tfile_base_4])
+    #SMHMv__distance([tfile_1,tfile_2,tfile_3,tfile_4],outfile_base,[tfile_base_1,tfile_base_2,tfile_base_3,tfile_base_4])
+    SMHM_v_distance([tfile_cm, tfile_e, tfile_r, tfile_s, tfile_1, tfile_1hr, tfile_2, tfile_3, tfile_4, tfile_4hr],outfile_base,[tfile_base_cm, tfile_base_e, tfile_base_r, tfile_base_s, tfile_base_1, tfile_base_1hr, tfile_base_2, tfile_base_3, tfile_base_4, tfile_base_4hr])
+
