@@ -6,6 +6,8 @@
 #%run /home/christenc/Code/python/python_analysis/quench_v_distance.py
 #ipython --pylab
 
+import matplotlib as mpl
+mpl.use('tkagg')
 import numpy as np
 import pynbody
 import socket
@@ -15,7 +17,6 @@ import sys, os, glob, pickle
 from scipy.interpolate import interp1d
 import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
-import matplotlib as mpl
 #import pickle_read
 #import distance_to_nearest_host
 
@@ -143,7 +144,7 @@ if __name__ == '__main__':
         markersize = 100
         ms_scale = 1
         lw = mpl.rcParams['lines.linewidth'] - 1
-        edgewidth = 2
+        edgewidth = 1
     else:
         outbase = outprefix #+ 'marvel'
         plt.style.use(['default','/home/christenc/.config/matplotlib/article.mplstyle'])
@@ -329,7 +330,7 @@ if __name__ == '__main__':
     lgnd.legendHandles[1]._sizes = [markersize]
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.axis([10, 1e4, 1e2, 1e10])
+    ax1.axis([17, 7e3, 1e2, 1e10])
     ax1.set_ylabel(r'M$_*$/M$_\odot$')
     ax1.set_xlabel(r'Distance to massive galaxy (kpc)')
     cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
