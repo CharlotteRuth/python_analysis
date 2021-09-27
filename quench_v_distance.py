@@ -46,7 +46,8 @@ def match_halos(objs_pd, fdmdata):
     vmass_tol = 0.9
 
     match_id = {'m200_haloid': 0}
-    objs_pd = objs_pd.join(pd.DataFrame(columns=match_id))
+    if not 'm200_haloid' in objs_pd.keys():
+        objs_pd = objs_pd.join(pd.DataFrame(columns=match_id))
     
     for sim in pd.unique(objs_pd['sim']):
         objs_pd_sim = objs_pd[objs_pd['sim'] == sim].copy()
@@ -57,9 +58,10 @@ def match_halos(objs_pd, fdmdata):
             else:
                 #print(fdmdata[fdmdata['simname']==sim][possible_match]['halogrp_z0'])
                 arg_best_match = np.argmin(np.abs(fdmdata[fdmdata['simname']==sim][possible_match]['Mstar_z0'] - float(objs_pd_sim[objs_pd_sim['haloid'] == halo]['M_star'])))
-                objs_pd.loc[(objs_pd['sim'] == sim) & (objs_pd['haloid'] == halo),'m200_haloid'] = fdmdata.loc[arg_best_match]['halogrp_z0']
-                #print(sim, halo, fdmdata.loc[arg_best_match]['halogrp_z0'], float(objs_pd[(objs_pd['sim'] == sim) & (objs_pd['haloid'] == halo)]['M_star']), fdmdata.loc[arg_best_match]['Mstar_z0'], float(objs_pd[(objs_pd['sim'] == sim) & (objs_pd['haloid'] == halo)]['mass']), fdmdata.loc[arg_best_match]['Mhalo_z0'])
-                fdmdata.loc[arg_best_match,'Mstar_z0'] = 0 #set stellar mass to zero so it
+                index_best_match = (fdmdata[fdmdata['simname']==sim][possible_match]).index[arg_best_match]
+                objs_pd.loc[(objs_pd['sim'] == sim) & (objs_pd['haloid'] == halo),'m200_haloid'] = fdmdata.loc[index_best_match]['halogrp_z0']
+                #print(sim, halo, fdmdata.loc[index_best_match]['halogrp_z0'], float(objs_pd[(objs_pd['sim'] == sim) & (objs_pd['haloid'] == halo)]['M_star']), fdmdata.loc[index_best_match]['Mstar_z0'], float(objs_pd[(objs_pd['sim'] == sim) & (objs_pd['haloid'] == halo)]['mass']), fdmdata.loc[index_best_match]['Mhalo_z0'])
+                fdmdata.loc[index_best_match,'Mstar_z0'] = 0 #set stellar mass to zero so it
 
     return objs_pd
                 
@@ -155,7 +157,7 @@ if __name__ == '__main__':
         markersize = 25
         ms_scale = 0.25
         lw = mpl.rcParams['lines.linewidth']
-        edgewidth = 0.5
+        edgewidth = 0.7
         
     if (socket.gethostname() == "ozma.grinnell.edu"):
         dataprefix = '/home/christensen/Code/Datafiles/' 
@@ -184,6 +186,7 @@ if __name__ == '__main__':
     f.close()
     fdmdata = pd.DataFrame(fdmdata)
 
+    
     tfile_base_cm = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH'
     tfile_cm = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096' #'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
 
@@ -224,7 +227,8 @@ if __name__ == '__main__':
     objs_pd = None 
     for tfile, base in zip(tfiles, tfile_base):
         objs_dat = []
-        #print(tfile)
+        print(tfile)
+        '''
         f=open(tfile + '.MAP.data', 'rb')
         while 1:
             try:
@@ -232,6 +236,8 @@ if __name__ == '__main__':
             except EOFError:
                 break        
         f.close()
+        '''
+        objs_dat = pd.read_csv(tfile + '.MAP.data.csv')
         if len(objs_dat) == 1:
             temp = pd.DataFrame(objs_dat[0])
         else:
@@ -245,24 +251,56 @@ if __name__ == '__main__':
         temp['sim'] = [simname]*len(temp)
         if not 'massiveDist' in temp:
             temp = distance_to_nearest_host(temp,[tfile])
-            temp.to_pickle(tfile + '.MAP.data')
+            #temp.to_pickle(tfile + '.MAP.data')
+            temp.to_csv(tfile + '.MAP.data.csv')
+
+        temp.to_csv(tfile + '.MAP.data.csv', index=False)
 
         if objs_pd is None: 
             objs_pd = temp
         else:
             objs_pd = objs_pd.append(temp, ignore_index = True)     
-    
+
+    #Match halos between my and Ferah's data    
     fdmdata_mod = fdmdata.copy()
     objs_pd = match_halos(objs_pd, fdmdata_mod)
+    #remove entries (rows) from objs_pd that have no match in Ferah's data
+    index_rm = objs_pd[(objs_pd['m200_haloid']).isnull()].index
+    objs_pd = objs_pd.drop(index_rm)
     
     ind = 0
     tau90 = np.empty(len(objs_pd))            
     for index, row in objs_pd.iterrows():
-        if len(row['sfhbins']) != len(row['sfh']):
-            xarr = row['sfhbins'][1:] - (row['sfhbins'][1] - row['sfhbins'][0])
+        row['sfh'] = row['sfh'].replace('  ',' ')
+        row['sfh'] = row['sfh'].replace('   ',' ')
+        row['sfh'] = row['sfh'].replace('    ',' ')
+        row['sfh'] = row['sfh'].replace('     ',' ')        
+        sfh_str = ((row['sfh'])[2:-1].replace('\n','')).split(' ')
+        sfh = []
+        for x in sfh_str:
+            if x != '':
+                sfh.append(float(x))
+        sfh = np.array(sfh)
+        #sfh = np.array([float(x) for x in sfh_str])
+        row['sfhbins'] = row['sfhbins'].replace('  ',' ')
+        row['sfhbins'] = row['sfhbins'].replace('   ',' ')
+        row['sfhbins'] = row['sfhbins'].replace('    ',' ')
+        row['sfhbins'] = row['sfhbins'].replace('     ',' ')
+        sfhbins_str = ((row['sfhbins'])[2:-1].replace('\n','')).split(' ')
+        sfhbins = []
+        for x in sfhbins_str:
+            if x != '':
+                sfhbins.append(float(x))
+        sfhbins = np.array(sfhbins)
+        #sfhbins = np.array([float(x) for x in sfhbins_str])
+        #sfh = row['sfh']
+        #sfhbins = row['sfhbins']
+        
+        if len(sfhbins) != len(sfh):
+            xarr = sfhbins[1:] - (sfhbins[1] - sfhbins[0])
         else:
-            xarr = row['sfhbins'][:]
-        yarr = np.cumsum(row['sfh'])/max(np.cumsum(row['sfh']))
+            xarr = sfhbins[:]
+        yarr = np.cumsum(sfh)/max(np.cumsum(sfh))
         if (yarr[0] >= 0.9):
             tau90[ind] = xarr[0]
         else:
@@ -314,13 +352,19 @@ if __name__ == '__main__':
 
     #scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmx)
     plt.clf()
-    fig1 = plt.figure(1,figsize = (plt_width,plt_width*aspect_ratio))
+    fig1 = plt.figure(1,figsize = (plt_width,plt_width*aspect_ratio*1.2))
+    fig1.set_size_inches(plt_width,plt_width*aspect_ratio*1.2)
     fig1.clear()
-    gs = gridspec.GridSpec(1,2,width_ratios=[15,1])
-    ax1 = fig1.add_subplot(gs[0])
-    ax1sub = fig1.add_subplot(gs[1])
+    #gs = fig2.add_gridspec(1)
+    #axs = gs.subplots() #, constrained_layout=True)
+    #axs = axs.flatten()
+    #ax1 = axs[0]
+    #fig1.subplots(constrained_layout)
+    gs = gridspec.GridSpec(ncols = 1,nrows = 2, figure=fig1, height_ratios=[1,15])
+    ax1 = fig1.add_subplot(gs[1])
+    ax1sub = fig1.add_subplot(gs[0])
 
-    cmx = plt.get_cmap("viridis") 
+    cmx = plt.get_cmap("cool_r") 
     cNorm  = colors.Normalize(vmin=0, vmax = 14)    
     q = ax1.scatter(objs_pd[objs_pd['SFR'] < 1e-11]['massiveDist'],objs_pd['M_star'][objs_pd['SFR'] < 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] < 1e-11]*2*ms_scale).tolist(), c = tau90[objs_pd['SFR'] < 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D', linewidths = edgewidth)
     sf = ax1.scatter(objs_pd[objs_pd['SFR'] >= 1e-11]['massiveDist'],objs_pd['M_star'][objs_pd['SFR'] >= 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] >= 1e-11]*2*ms_scale).tolist(), c = tau90[objs_pd['SFR'] >= 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k', linewidths = edgewidth)
@@ -333,10 +377,14 @@ if __name__ == '__main__':
     ax1.axis([17, 7e3, 1e2, 1e10])
     ax1.set_ylabel(r'M$_*$/M$_\odot$')
     ax1.set_xlabel(r'Distance to massive galaxy (kpc)')
-    cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm)
+    sm = plt.cm.ScalarMappable(cmap=cmx, norm=cNorm)
+    #ax1sub = fig1.add_subplot([0.15,0.87,0.35,0.03])
+    #cb = plt.colorbar(sm, ax=ax1sub, orientation='horizontal',aspect = 20)    
+    cb = mpl.colorbar.ColorbarBase(ax1sub, cmap=cmx, norm=cNorm, orientation='horizontal')
     cb.set_label(r"$\tau_{90}$ (Gyr)")
-    fig1.set_size_inches(plt_width,plt_width*aspect_ratio)
+    #fig1.subplots_adjust(hspace = 0.3)
     fig1.tight_layout()
+    fig1.subplots_adjust(hspace = 0.4)
     fig1.show()
     fig1.savefig(outbase + '_distance_smass_t90.png',dpi = dpi)    
 
