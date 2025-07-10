@@ -2,12 +2,13 @@ import os
 import pandas as pd
 import pynbody
 import tangos
+import numpy as np
+import sys, os, glob, pickle
+
 import matplotlib.colors as colors
 from matplotlib import path
-import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
-import sys, os, glob, pickle
 
 filepath = '/home/christenc/Data/Sims/h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/'
 filename = filepath.split('/')[-2]
@@ -19,7 +20,10 @@ filename = filepath.split('/')[-2]
 simname = 'Ruth'
 simshort = 'h229'
 
-
+filepath = '/home/christenc/Data/Sims/h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/'
+filename = filepath.split('/')[-2]
+simname = 'Sonia'
+simshort = 'h242'
 
 filepath = '/home/christenc/Data/Sims/h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/'
 filename = filepath.split('/')[-2]
@@ -28,7 +32,42 @@ simshort = 'h329'
 
 
 #tangos.init_db(filepath + simshort + '.db')
-tangos.init_db('/home/christenc/Storage/tangos_db/JL_r200.db')
+#tangos.init_db('/home/christenc/Storage/tangos_db/JL_r200.db')
+tangos.init_db('/data2/REPOSITORY/tangos.db')
+
+#simname="h329.cosmo50PLK.3072gst"
+#simname="h242.cosmo50PLK.3072gst"
+#simname="h229.cosmo50PLK.3072gst"
+simname="h148.cosmo50PLK.3072gst"
+timestep = tangos.get_simulation(simname).timesteps[-1]
+#halo_ids = timestep.calculate_all("Grp")
+halo_ids = timestep.calculate_all("halo_number()")
+
+mvir_max = np.empty(len(halo_ids[0]))
+t_mvir_max = np.empty(len(halo_ids[0]))
+halogrp_mvir_max = np.empty(len(halo_ids[0]))
+mvirs = np.empty(len(halo_ids[0]))
+
+hubble = 0.6776942783267969
+
+i = 0
+for halo in halo_ids[0]:
+    tangos_halo = tangos.get_halo(simname+'/%.004096/halo_' + str(halo))
+    if not tangos_halo is None:
+        time, ids, mvir = tangos_halo.calculate_for_progenitors("t()", "halo_number()", "Mhalo")
+        mvir = mvir/hubble
+        #time, ids, mvir = tangos_halo.calculate_for_progenitors("t()", "halo_number()", "Mvir")
+        if len(mvir) > 0:
+            print(halo,time[np.argmax(mvir)],mvir[0]/max(mvir),max(mvir),mvir[0])
+            mvir_max[i] = max(mvir)
+            t_mvir_max[i] = time[np.argmax(mvir)]
+            halogrp_mvir_max[i] = ids[np.argmax(mvir)]
+            mvirs[i] = mvir[0]
+    i = i + 1
+
+halo_data = np.array([halo_ids[0],halogrp_mvir_max,mvir_max,t_mvir_max,mvirs])
+df = pd.DataFrame(data=halo_data.T,index=halo_ids[0],columns=["halogrp_z0","halogrp_Mpeak","Mpeak","t_Mpeak","Mhalo_z0"])
+df.to_csv(simname+'_Mpeak.csv',index=False)
 
 timesteps = tangos.get_simulation("snapshots_200crit_" + simshort).timesteps
 snap_nums = [re.findall(r'.00+[\d]+', str(snap))[0][3:] for snap in timesteps]
