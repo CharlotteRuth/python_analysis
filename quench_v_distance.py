@@ -163,6 +163,17 @@ if __name__ == '__main__':
         dataprefix = '/home/christensen/Code/Datafiles/' 
     else:
         dataprefix = '/home/christenc/Code/Datafiles/'
+
+    objs_rom = pd.read_csv('/home/christenc/Storage/Cosmo/cosmo25/romulus25.m200.data.csv')    
+
+    use_m200 = 1
+    if use_m200:
+        ext = '.m200.'
+        path = '/ahf_200/'
+    else:
+        ext = '.MAP.'
+        path = '/'
+    
     f = open(dataprefix+'mstar_vs_mhalo_4Charlotte.txt', 'r')
     fdmdata = []
     for line in f:
@@ -186,37 +197,39 @@ if __name__ == '__main__':
     f.close()
     fdmdata = pd.DataFrame(fdmdata)
 
+    #read dataprefix+'/assembly_histories.npy'
+    #read dataprefix+'/reduced_time_series_data.npy'
     
     tfile_base_cm = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH'
-    tfile_cm = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096' #'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_cm = prefix + 'cptmarvel.cosmo25cmb/cptmarvel.cosmo25cmb.4096g5HbwK1BH/cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096' + path + 'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096' #'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
 
-    tfile_r = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_r = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096' + path + 'rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base_r = 'rogue.cosmo25cmb.4096g5HbwK1BH'
 
-    tfile_e = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_e = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096' + path + 'elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base_e = 'elektra.cosmo25cmb.4096g5HbwK1BH'
 
-    tfile_s = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/storm.cosmo25cmb.4096g5HbwK1BH.004096'
+    tfile_s = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096' + path + 'storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base_s = 'storm.cosmo25cmb.4096g5HbwK1BH'
     
     tfile_base_1 = 'h148.cosmo50PLK.3072g3HbwK1BH'
     tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/snapshots_200bkgdens/h148.cosmo50PLK.3072g3HbwK1BH.004096' #
-    tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096/h148.cosmo50PLK.3072g3HbwK1BH.004096'
+    tfile_1 = prefix + 'h148.cosmo50PLK.3072g/h148.cosmo50PLK.3072g3HbwK1BH/h148.cosmo50PLK.3072g3HbwK1BH.004096' + path + 'h148.cosmo50PLK.3072g3HbwK1BH.004096'
     
     tfile_base_1hr = 'h148.cosmo50PLK.6144g3HbwK1BH/'
     tfile_1hr = prefix + 'h148.cosmo50PLK.6144g/h148.cosmo50PLK.6144g3HbwK1BH/h148.cosmo50PLK.6144g3HbwK1BH.004096/ahf_200/h148.cosmo50PLK.6144g3HbwK1BH.004096'
     
     tfile_base_2 = 'h229.cosmo50PLK.3072gst5HbwK1BH'
     tfile_2 = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h229.cosmo50PLK.3072gst5HbwK1BH.004096' #
-    tfile_2 = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096/h229.cosmo50PLK.3072gst5HbwK1BH.004096'    
+    tfile_2 = prefix + 'h229.cosmo50PLK.3072g/h229.cosmo50PLK.3072gst5HbwK1BH/h229.cosmo50PLK.3072gst5HbwK1BH.004096' + path + 'h229.cosmo50PLK.3072gst5HbwK1BH.004096'    
     
     tfile_base_3 = 'h242.cosmo50PLK.3072gst5HbwK1BH'
     tfile_3 = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h242.cosmo50PLK.3072gst5HbwK1BH.004096' #
-    tfile_3 = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096/h242.cosmo50PLK.3072gst5HbwK1BH.004096'
+    tfile_3 = prefix + 'h242.cosmo50PLK.3072g/h242.cosmo50PLK.3072gst5HbwK1BH/h242.cosmo50PLK.3072gst5HbwK1BH.004096' + path + 'h242.cosmo50PLK.3072gst5HbwK1BH.004096'
 
     tfile_base_4 = 'h329.cosmo50PLK.3072gst5HbwK1BH'
     tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/snapshots_200bkgdens/h329.cosmo50PLK.3072gst5HbwK1BH.004096' #
-    tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096/h329.cosmo50PLK.3072gst5HbwK1BH.004096'
+    tfile_4 = prefix + 'h329.cosmo50PLK.3072g/h329.cosmo50PLK.3072gst5HbwK1BH/h329.cosmo50PLK.3072gst5HbwK1BH.004096' + path + 'h329.cosmo50PLK.3072gst5HbwK1BH.004096'
     
     tfile_base_4hr = 'h329.cosmo50PLK.6144g5HbwK1BH'
     tfile_4hr = prefix + 'h329.cosmo50PLK.6144g/h329.cosmo50PLK.6144g5HbwK1BH/h329.cosmo50PLK.6144g5HbwK1BH.004096/ahf_200/h329.cosmo50PLK.6144g5HbwK1BH.004096' #    
@@ -228,16 +241,16 @@ if __name__ == '__main__':
     for tfile, base in zip(tfiles, tfile_base):
         objs_dat = []
         print(tfile)
-        '''
-        f=open(tfile + '.MAP.data', 'rb')
+
+        f=open(tfile + ext + 'data', 'rb')
         while 1:
             try:
                 objs_dat.append(pickle.load(f))
             except EOFError:
                 break        
         f.close()
-        '''
-        objs_dat = pd.read_csv(tfile + '.MAP.data.csv')
+                
+        #objs_dat = pd.read_csv(tfile + '.MAP.data.csv') #
         if len(objs_dat) == 1:
             temp = pd.DataFrame(objs_dat[0])
         else:
@@ -245,16 +258,18 @@ if __name__ == '__main__':
         simname = base.split('.')[0]
         if (base.split('.')[2])[0] == '6':
             simname = simname+'_6144'
+        if not ('M_star' in temp.keys()):
             temp['M_star'] = temp['mstar']
-            temp['mass'] = temp['mvir']
+        if not ('mass' in temp.keys()):            
+            temp['mass'] = temp['mvir']            
             
         temp['sim'] = [simname]*len(temp)
         if not 'massiveDist' in temp:
             temp = distance_to_nearest_host(temp,[tfile])
             #temp.to_pickle(tfile + '.MAP.data')
-            temp.to_csv(tfile + '.MAP.data.csv')
+            temp.to_csv(tfile + ext + 'data.csv')
 
-        temp.to_csv(tfile + '.MAP.data.csv', index=False)
+        temp.to_csv(tfile + ext + 'data.csv', index=False)
 
         if objs_pd is None: 
             objs_pd = temp
@@ -271,7 +286,8 @@ if __name__ == '__main__':
     ind = 0
     tau90 = np.empty(len(objs_pd))            
     for index, row in objs_pd.iterrows():
-        row['sfh'] = row['sfh'].replace('  ',' ')
+        #print(row['sim'],row['haloid'])        
+        """row['sfh'] = row['sfh'].replace('  ',' ')
         row['sfh'] = row['sfh'].replace('   ',' ')
         row['sfh'] = row['sfh'].replace('    ',' ')
         row['sfh'] = row['sfh'].replace('     ',' ')        
@@ -292,9 +308,9 @@ if __name__ == '__main__':
             if x != '':
                 sfhbins.append(float(x))
         sfhbins = np.array(sfhbins)
-        #sfhbins = np.array([float(x) for x in sfhbins_str])
-        #sfh = row['sfh']
-        #sfhbins = row['sfhbins']
+        #sfhbins = np.array([float(x) for x in sfhbins_str])"""
+        sfh = row['sfh']
+        sfhbins = row['sfhbins']
         
         if len(sfhbins) != len(sfh):
             xarr = sfhbins[1:] - (sfhbins[1] - sfhbins[0])
@@ -365,9 +381,10 @@ if __name__ == '__main__':
     ax1sub = fig1.add_subplot(gs[0])
 
     cmx = plt.get_cmap("cool_r") 
-    cNorm  = colors.Normalize(vmin=0, vmax = 14)    
-    q = ax1.scatter(objs_pd[objs_pd['SFR'] < 1e-11]['massiveDist'],objs_pd['M_star'][objs_pd['SFR'] < 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] < 1e-11]*2*ms_scale).tolist(), c = tau90[objs_pd['SFR'] < 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D', linewidths = edgewidth)
-    sf = ax1.scatter(objs_pd[objs_pd['SFR'] >= 1e-11]['massiveDist'],objs_pd['M_star'][objs_pd['SFR'] >= 1e-11],s = (objs_pd['Rvir'][objs_pd['SFR'] >= 1e-11]*2*ms_scale).tolist(), c = tau90[objs_pd['SFR'] >= 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k', linewidths = edgewidth)
+    cNorm  = colors.Normalize(vmin=0, vmax = 14)
+    ax1.scatter(objs_rom['massiveDist'],objs_rom['mstar'],c = objs_rom['tau90'],cmap = cmx, norm = cNorm,alpha = 0.2, s = markersize*0.5)
+    q = ax1.scatter(objs_pd[np.array(list(zip(*objs_pd['SFR']))[0]) < 1e-11]['massiveDist'],objs_pd['M_star'][np.array(list(zip(*objs_pd['SFR']))[0]) < 1e-11],s = (objs_pd['rvir'][np.array(list(zip(*objs_pd['SFR']))[0]) < 1e-11]*2*ms_scale).tolist(), c = tau90[np.array(list(zip(*objs_pd['SFR']))[0]) < 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k',marker = 'D', linewidths = edgewidth)
+    sf = ax1.scatter(objs_pd[np.array(list(zip(*objs_pd['SFR']))[0]) >= 1e-11]['massiveDist'],objs_pd['M_star'][np.array(list(zip(*objs_pd['SFR']))[0]) >= 1e-11],s = (objs_pd['rvir'][np.array(list(zip(*objs_pd['SFR']))[0]) >= 1e-11]*2*ms_scale).tolist(), c = tau90[np.array(list(zip(*objs_pd['SFR']))[0]) >= 1e-11], cmap = cmx, norm = cNorm,edgecolor = 'k', linewidths = edgewidth)
     #plt.scatter(objs_pd_e['h1dist'],objs_pd_e['M_star'])
     lgnd = ax1.legend([q,sf],['Quenched','Star forming'],scatterpoints = 1,facecolor = 'white',loc = 3,framealpha = 0,frameon = False)
     lgnd.legendHandles[0]._sizes = [markersize]

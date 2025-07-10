@@ -4042,6 +4042,7 @@ if __name__ == '__main__':
 
     tfile_e = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/ahf_200/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base_e = 'elektra.cosmo25cmb.4096g5HbwK1BH'
+
     tfile_s = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/ahf_200/storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_base_s = 'storm.cosmo25cmb.4096g5HbwK1BH'
     
@@ -4079,13 +4080,7 @@ if __name__ == '__main__':
     tfile_base = [tfile_base_cm, tfile_base_e, tfile_base_r, tfile_base_s, tfile_base_1hr, tfile_base_2, tfile_base_3, tfile_base_4hr]
     
     objs_pd_comb = SMHM_v_distance_data(tfiles, outfile_base, tfile_base)
+    print(objs_pd_comb[(objs_pd_comb['Mstar_z0_photo'] > 5e5) & (objs_pd_comb['Mstar_z0_photo'] < 5e7) & (objs_pd_comb['massiveDist'] > 800) ]['haloid']
+    #SMHM_v_distance_plts(tfiles,outfile_base,tfile_base,objs_pd_comb)
 
     
-    SMHM_v_distance_plts(tfiles,outfile_base,tfile_base,objs_pd_comb)
-    print(objs_pd_comb[(objs_pd_comb['Mstar_z0_photo'] > 5e5) & (objs_pd_comb['Mstar_z0_photo'] < 5e7) & (objs_pd_comb['massiveDist'] > 800) ]['haloid'])
-    
-
-
-
-
-
