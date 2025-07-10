@@ -8,7 +8,7 @@ sim.gas['iord'] = np.empty(len(sim.gas))
 sim.dark['iord'] = sim3.dark['iord']
 sim.star['iord'] = (sim3.star['iord'])[0:len(sim.star)]
 
-write_tipsyarr(sim, sim[iord], ext = "iord")
+write_tipsyarr(sim, sim['iord'], ext = "iord")
 """
 
 # typefmt="d" for integers, "f" for float, "b" for binary, and "s" string

@@ -43,7 +43,7 @@ def bin_plt(xdata, ydata, xmin=None, xmax = None, nbins = 10, perc = np.array([1
             data[i,:] = np.percentile(ydata[(xdata >= xaxis[i] - dwidth) & (xdata < xaxis[i] + dwidth)],perc)
     return xaxis, data
 
-def plotColumnDen(tfile,halo_num,bordoloidata,burchettdata):
+def createSpectra(tfile,halo_num,bordoloidata,burchettdata):
     presentation = True
     if presentation:
         plt.style.use(['default','/home/christenc/.config/matplotlib/presentation.mplstyle'])
@@ -74,7 +74,7 @@ def plotColumnDen(tfile,halo_num,bordoloidata,burchettdata):
     hfbsmass = np.sum(h[halo_num].stars['mass'].in_units('Msol'))
     hfbvmass = np.sum(h[halo_num]['mass'].in_units('Msol'))
     hfb_all.physical_units()
-    pynbody.analysis.angmom.faceon(h[halo_num], move_all = True)
+    pynbody.analysis.angmom.edgeon(h[halo_num], move_all = True)
             
     hfbrvir = np.max(h[halo_num].gas['r'])
     hfb_all['velmag'] = np.sqrt(hfb_all['vx']**2 + hfb_all['vy']**2 + hfb_all['vz']**2)
@@ -89,7 +89,30 @@ def plotColumnDen(tfile,halo_num,bordoloidata,burchettdata):
     notdiskf = filt.Not(filt.Disc('8 kpc','2 kpc'))
 
     hfb.gas['hden'] = hfb.gas['rho']*hfb.gas['hydrogen']
-    hfb.gas['hden'].units = hfb.gas['rho'].units
+    hfb.gas['hden'].units = hfb.gas['rho'].units    
+    
+    vres = 10 # km/s
+    vmax = np.ceil(h[halo_num].properties['v_esc']/vres)*vres
+    #numvbins = np.ceil(h[halo_num].properties['v_esc']/vres)*2
+    vbin_start = np.arange(-1*vmax, vmax, vres)
+    spect_stack = []
+    for vbin_min in vbin_start:
+        velf = filt.BandPass('vz',vbin_min,vbin_min + vres)
+        hfb_bin = hfb[velf & notdiskf]
+        print('Gas between ' + str(vbin_min) + ' and ' + str(vbin_min + vres) + ': ', len(hfb_bin.gas))
+        plt.close()
+        hfbhim = pynbody.plot.image(hfb_bin.gas, qty='hden', width=np.round(hfbrvir/10)*10*2.5, units='m_p cm**-2',log=True) #, num_threads = 1)
+        if spect_stack == []:
+            spect_stack = hfbhim
+        else:
+            spect_stack = np.dstack((spect_stack,np.array(hfbhim)))
+        #wait = input('continue')
+
+    plt.clf()
+    fig1 = plt.figure(1)
+    ax = fig1.add_subplot(1,1,1)
+    ax.plot(vbin_start + vres/2,spect_stack[250,250,:])
+    
     plt.close()
     hfbhim = pynbody.plot.image(hfb.gas[notdiskf], qty='hden', width=np.round(hfbrvir/10)*10*2.5, units='m_p cm**-2',log=True) #, num_threads = 1)
     
@@ -384,7 +407,7 @@ if __name__ == '__main__':
     tfile_name = 'cptmarvel.cosmo25cmb.4096g5HbwK1BH.004096'
     for halo_num in halo_nums:
         print(tfile,halo_num)
-        civ_rad_0 = plotColumnDen(tfile,halo_num,bordoloidata,burchettdata)
+        civ_rad_0 = createSpectra(tfile,halo_num,bordoloidata,burchettdata)
     
     tfile = prefix + 'rogue.cosmo25cmb/rogue.cosmo25cmb.4096g5HbwK1BH/rogue.cosmo25cmb.4096g5HbwK1BH.004096/ahf_200/rogue.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'rogue.cosmo25cmb.4096g5HbwK1BH.004096'
@@ -392,24 +415,24 @@ if __name__ == '__main__':
     halo_nums = ['7','11','12','15','16','17','28','31']
     for halo_num in halo_nums:
         print(tfile,halo_num)        
-        civ_rad_0 = plotColumnDen(tfile,halo_num,bordoloidata,burchettdata)
-    #civ_rad_1 = plotColumnDen(tfile,halo_nums[0],bordoloidata,burchettdata)
-    #civ_rad_2 = plotColumnDen(tfile,halo_nums[1],bordoloidata,burchettdata)
+        civ_rad_0 = createSpectra(tfile,halo_num,bordoloidata,burchettdata)
+    #civ_rad_1 = createSpectra(tfile,halo_nums[0],bordoloidata,burchettdata)
+    #civ_rad_2 = createSpectra(tfile,halo_nums[1],bordoloidata,burchettdata)
 
     tfile = prefix + 'elektra.cosmo25cmb/elektra.cosmo25cmb.4096g5HbwK1BH/elektra.cosmo25cmb.4096g5HbwK1BH.004096/ahf_200/elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'elektra.cosmo25cmb.4096g5HbwK1BH.004096'
     halo_nums = ['1','2','3','4','5','10','12']
     for halo_num in halo_nums:
         print(tfile,halo_num)        
-        civ_rad_0 = plotColumnDen(tfile,halo_num,bordoloidata,burchettdata)
-    #civ_rad_3 = plotColumnDen(tfile,halo_nums[0],bordoloidata,burchettdata)
-    #civ_rad_4 = plotColumnDen(tfile,halo_nums[1],bordoloidata,burchettdata)    
+        civ_rad_0 = createSpectra(tfile,halo_num,bordoloidata,burchettdata)
+    #civ_rad_3 = createSpectra(tfile,halo_nums[0],bordoloidata,burchettdata)
+    #civ_rad_4 = createSpectra(tfile,halo_nums[1],bordoloidata,burchettdata)    
 
     tfile = prefix + 'storm.cosmo25cmb/storm.cosmo25cmb.4096g5HbwK1BH/storm.cosmo25cmb.4096g5HbwK1BH.004096/ahf_200/storm.cosmo25cmb.4096g5HbwK1BH.004096'
     tfile_name = 'storm.cosmo25cmb.4096g5HbwK1BH'
     halo_nums = ['1','2','3','4','5','6','7','8','10','11','12','14','15','23','44']
     for halo_num in halo_nums:
         print(tfile,halo_num)        
-        civ_rad_0 = plotColumnDen(tfile,halo_num,bordoloidata,burchettdata)
-    #civ_rad_5 = plotColumnDen(tfile,halo_nums[0],bordoloidata,burchettdata)
-    #civ_rad_6 = plotColumnDen(tfile,halo_nums[1],bordoloidata,burchettdata)
+        civ_rad_0 = createSpectra(tfile,halo_num,bordoloidata,burchettdata)
+    #civ_rad_5 = createSpectra(tfile,halo_nums[0],bordoloidata,burchettdata)
+    #civ_rad_6 = createSpectra(tfile,halo_nums[1],bordoloidata,burchettdata)
