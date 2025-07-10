@@ -15,20 +15,23 @@ import pynbody
 import numpy as np
 import sys, os, glob
 
+filename_base = "h148.cosmo50PLK.6144g3HbwK1BH"
 filename_base = "h329.cosmo50PLK.3072gst5HbwK1BH"
 #filename_base = "h242.cosmo50PLK.3072gst5HbwK1BH"
 #filename_base = "h229.cosmo50PLK.3072gst5HbwK1BH"
 filename_base = "h148.cosmo50PLK.3072g3HbwK1BH"
 filename_base = "h148.cosmo50PLK.3072gst"
+filename_base = "h229.cosmo50PLK.3072gst"
+filename_base = "h242.cosmo50PLK.3072gst"
+filename_base = "h329.cosmo50PLK.3072gst"
 
 snapshots = glob.glob(filename_base + ".00????")
 path = os.getcwd()
 path = '/'.join(path.split('/')[:-1])
 for tfile in snapshots:
-    #print(path + '/' + tfile + '/ahf_200/' + tfile + '.*.AHF_halos')
+    print(path + '/' + tfile + '/ahf_200/' + tfile + '.*.AHF_halos')
     if len(glob.glob(path + '/' + tfile + '/ahf_200/' + tfile + '.*.AHF_halos')) != 0:
         continue
-    print(tfile)
     s = pynbody.load(tfile)
     #if os.path.exists('AHF.in'):
     #os.system("cp ../AHF.in AHF.in")
@@ -52,4 +55,4 @@ for tfile in snapshots:
 
     os.system("mv AHF.in " + tfile + ".AHF.in")
 
-2554, 1475, 974, 225
+

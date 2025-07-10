@@ -6,7 +6,6 @@ import numpy as np
 import os
 
 #filebase = './h148.cosmo50PLK.3072g3HbwK1BH'
-filebase = './h242.cosmo50PLK.3072gst5HbwK1BH'
 #filebase = './h229.cosmo50PLK.3072gst5HbwK1BH'
 filebase = './h329.cosmo50PLK.3072gst5HbwK1BH'
 
@@ -15,7 +14,12 @@ filebase = './h329.cosmo50PLK.3072gst5HbwK1BH'
 #filebase = './h242.cosmo50PLK.3072gst'
 #filebase = './h148.cosmo50PLK.3072gst'
 
-#filebase = './h148.cosmo50PLK.6144g3HbwK1BH'
+
+filebase = './h329.cosmo50PLK.3072gst'
+filebase = './h229.cosmo50PLK.3072gst'
+filebase = './h242.cosmo50PLK.3072gst'
+filebase = './h148.cosmo50PLK.3072gst'
+filebase = './h148.cosmo50PLK.6144g3HbwK1BH'
 
 #filebase = 'cptmarvel.cosmo25cmb.4096'
 
@@ -55,6 +59,19 @@ for file_i in files:
     np.savetxt(grpoutfile, grp, fmt = formatarr)
     os.rename(sim.filename + ".amiga.grp", sim.filename + ".M200.amiga.grp")
     os.chdir(basepath)
+
+    snapshot = sim.ancestor                           
+    try:
+        snapshot['grp']
+    except:
+        halos.make_grp()
+    grpoutfile = sim.filename + '.amiga.grp'
+    formatarr = "%" + str(len(str(halos._nhalos)) + 1) + "d"
+    grp = np.append(np.array([len(snapshot['grp'])]),snapshot['grp'])
+    np.savetxt(grpoutfile, snapshot['grp'], fmt = formatarr)
+
+    halos.writetipsy(sim, halos, sim.filename + ".amiga.gtp") 
+
 
 #edit the amiga.stat file to remove the "?" from Satellite?
     
